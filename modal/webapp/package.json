@@ -33,5 +33,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:8000"
+  "proxy": "https://fuchr--orpheus-tts-api-refined-v2-orpheusttsapi-run-fastapi-app.modal.run"
 } 

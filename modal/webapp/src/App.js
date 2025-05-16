@@ -1,18 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import WaveSurfer from 'wavesurfer.js';
+import config from './config';
 
+// Hindi sample sentences without translations
 const SAMPLE_HINDI_SENTENCES = [
-  { text: "नमस्ते, आपका दिन कैसा रहा?", description: "Hello, how was your day?" },
-  { text: "भारत एक विविधतापूर्ण देश है", description: "India is a diverse country" },
-  { text: "मैं हिंदी में बात कर रहा हूँ", description: "I am speaking in Hindi" },
-  { text: "क्या आप मेरी आवाज़ सुन सकते हैं?", description: "Can you hear my voice?" },
-  { text: "कृपया मुझे वह किताब दे दीजिए", description: "Please give me that book" },
-  { text: "आज मौसम बहुत अच्छा है", description: "The weather is very nice today" },
-  { text: "मुझे संगीत सुनना पसंद है", description: "I like listening to music" },
-  { text: "क्या आप मुझे समझ सकते हैं?", description: "Can you understand me?" },
-  { text: "माया रिसर्च में आपका स्वागत है", description: "Welcome to Maya Research" },
-  { text: "आर्टिफिशियल इंटेलिजेंस का भविष्य उज्जवल है", description: "The future of artificial intelligence is bright" },
+  "नमस्ते, आपका दिन कैसा रहा?",
+  "भारत एक विविधतापूर्ण देश है",
+  "मैं हिंदी में बात कर रहा हूँ",
+  "क्या आप मेरी आवाज़ सुन सकते हैं?",
+  "कृपया मुझे वह किताब दे दीजिए",
+  "आज मौसम बहुत अच्छा है",
+  "मुझे संगीत सुनना पसंद है",
+  "क्या आप मुझे समझ सकते हैं?",
+  "माया रिसर्च में आपका स्वागत है",
+  "आर्टिफिशियल इंटेलिजेंस का भविष्य उज्जवल है",
+  "यह एक नई तकनीक है जो भाषा को आवाज़ में बदलती है",
+  "आपकी आवाज़ बहुत सुरीली है",
+  "मेरा नाम आइशा है और मैं आपकी सहायता करने के लिए यहां हूं",
+  "आज हम एक नई यात्रा पर निकलेंगे",
+  "हिंदी भारत की प्रमुख भाषाओं में से एक है"
 ];
 
 function App() {
@@ -66,7 +73,7 @@ function App() {
         barWidth: 2,
         barRadius: 3,
         cursorWidth: 1,
-        height: 100,
+        height: 150,
         barGap: 3,
         responsive: true,
         normalize: true,
@@ -84,7 +91,7 @@ function App() {
   // Check API health status
   const checkHealth = async () => {
     try {
-      const response = await fetch('/health');
+      const response = await fetch(`${config.apiUrl}/health`);
       const data = await response.json();
       setHealthStatus(data);
       setIsHealthy(data.status === 'healthy');
@@ -112,7 +119,7 @@ function App() {
     };
     
     try {
-      const response = await fetch('/generate', {
+      const response = await fetch(`${config.apiUrl}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +153,7 @@ function App() {
   }, [showHealthCheck]);
   
   const selectSampleSentence = (sentence) => {
-    setText(sentence.text);
+    setText(sentence);
   };
   
   return (
@@ -157,255 +164,238 @@ function App() {
       <div className="parallax-container">
         <div className="parallax-background" ref={parallaxRef}></div>
         
-        <header className="app-header">
-          <div className="logo-container">
-            <div className="logo">माया</div>
-            <div className="logo-subtitle">RESEARCH</div>
-          </div>
-          <h1 className="title">Orpheus Hindi TTS</h1>
-          <p className="subtitle">Neural Text-to-Speech Synthesis for Hindi</p>
-        </header>
-        
-        <div className="content-container">
-          <div className="main-content">
-            <div className="text-input-section">
-              <h2>Enter Text to Synthesize</h2>
-              <div className="input-container">
-                <textarea
-                  className="text-input"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Type Hindi text here or select a sample sentence below..."
-                  rows={4}
-                />
-                
-                <div className="samples-section">
-                  <h3>Sample Sentences</h3>
-                  <div className="sample-grid">
-                    {SAMPLE_HINDI_SENTENCES.map((sentence, index) => (
-                      <div
-                        key={index}
-                        className="sample-card"
-                        onClick={() => selectSampleSentence(sentence)}
-                      >
-                        <div className="sample-text">{sentence.text}</div>
-                        <div className="sample-description">{sentence.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="speaker-selection">
-                <label htmlFor="speaker-select">Voice:</label>
-                <select 
-                  id="speaker-select"
-                  value={speakerId}
-                  onChange={(e) => setSpeakerId(e.target.value)}
-                >
-                  <option value="aisha">Aisha</option>
-                </select>
-              </div>
-              
-              <div className="advanced-toggle">
-                <button
-                  className={`toggle-button ${advancedOptions ? 'active' : ''}`}
-                  onClick={() => setAdvancedOptions(!advancedOptions)}
-                >
-                  {advancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
-                </button>
-              </div>
-              
-              {advancedOptions && (
-                <div className="advanced-options">
-                  <div className="option-row">
-                    <div className="option-group">
-                      <label htmlFor="max-tokens">Max New Tokens:</label>
-                      <input
-                        id="max-tokens"
-                        type="range"
-                        min="100"
-                        max="4096"
-                        step="1"
-                        value={maxNewTokens}
-                        onChange={(e) => setMaxNewTokens(parseInt(e.target.value))}
-                      />
-                      <span className="value-display">{maxNewTokens}</span>
-                    </div>
-                    
-                    <div className="option-group">
-                      <label htmlFor="temperature">Temperature:</label>
-                      <input
-                        id="temperature"
-                        type="range"
-                        min="0"
-                        max="2"
-                        step="0.05"
-                        value={temperature}
-                        onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                      />
-                      <span className="value-display">{temperature.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="option-row">
-                    <div className="option-group">
-                      <label htmlFor="top-p">Top P:</label>
-                      <input
-                        id="top-p"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={topP}
-                        onChange={(e) => setTopP(parseFloat(e.target.value))}
-                      />
-                      <span className="value-display">{topP.toFixed(2)}</span>
-                    </div>
-                    
-                    <div className="option-group">
-                      <label htmlFor="repetition-penalty">Repetition Penalty:</label>
-                      <input
-                        id="repetition-penalty"
-                        type="range"
-                        min="1"
-                        max="2"
-                        step="0.05"
-                        value={repetitionPenalty}
-                        onChange={(e) => setRepetitionPenalty(parseFloat(e.target.value))}
-                      />
-                      <span className="value-display">{repetitionPenalty.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="option-row">
-                    <div className="option-group">
-                      <label htmlFor="speed-adjustment">Speed Adjustment:</label>
-                      <input
-                        id="speed-adjustment"
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.05"
-                        value={speedAdjustment}
-                        onChange={(e) => setSpeedAdjustment(parseFloat(e.target.value))}
-                      />
-                      <span className="value-display">{speedAdjustment.toFixed(2)}x</span>
-                    </div>
-                    
-                    <div className="option-group">
-                      <label htmlFor="audio-quality">Audio Quality:</label>
-                      <select
-                        id="audio-quality"
-                        value={audioQualityPreset}
-                        onChange={(e) => setAudioQualityPreset(e.target.value)}
-                      >
-                        <option value="low">Low (16kHz)</option>
-                        <option value="medium">Medium (24kHz)</option>
-                        <option value="high">High (24kHz, best quality)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="generate-button-container">
-                <button
-                  className="generate-button"
-                  onClick={generateSpeech}
-                  disabled={isGenerating || !text.trim()}
-                >
-                  {isGenerating ? (
-                    <>
-                      <span className="spinner"></span>
-                      Generating...
-                    </>
-                  ) : (
-                    "Generate Speech"
-                  )}
-                </button>
-              </div>
-            </div>
+        <div className="app-container">
+          {/* Top Bar with Title and Health Check */}
+          <div className="top-bar">
+            <h1 className="brand-name">Maya Research</h1>
             
-            <div className={`audio-output-section ${audioUrl ? 'active' : ''}`}>
-              <h2>Generated Audio</h2>
-              {audioUrl && (
-                <>
-                  <div className="waveform-container" ref={waveformRef}></div>
-                  <div className="audio-controls">
-                    <audio ref={audioRef} controls>
-                      <source src={audioUrl} type="audio/wav" />
-                      Your browser does not support the audio element.
-                    </audio>
-                    <a
-                      href={audioUrl}
-                      download="maya_tts_output.wav"
-                      className="download-button"
-                    >
-                      Download Audio
-                    </a>
-                  </div>
-                </>
-              )}
-              {!audioUrl && !isGenerating && (
-                <div className="placeholder-message">
-                  Generated audio will appear here
+            <div className="health-check-container">
+              <button 
+                className={`health-toggle ${showHealthCheck ? 'active' : ''}`}
+                onClick={() => setShowHealthCheck(!showHealthCheck)}
+              >
+                System Status
+              </button>
+              
+              {showHealthCheck && (
+                <div className="health-dropdown">
+                  {isHealthy === null ? (
+                    <div className="loading">Checking status...</div>
+                  ) : (
+                    <>
+                      <div className={`status-indicator ${isHealthy ? 'healthy' : 'unhealthy'}`}>
+                        {isHealthy ? 'API Operational' : 'API Issues Detected'}
+                      </div>
+                      
+                      {healthStatus && healthStatus.timestamp && (
+                        <div className="status-timestamp">
+                          Updated: {new Date(healthStatus.timestamp * 1000).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
           </div>
           
-          <div className="system-status-section">
-            <div className="health-check-toggle">
-              <button 
-                className={`health-toggle ${showHealthCheck ? 'active' : ''}`}
-                onClick={() => setShowHealthCheck(!showHealthCheck)}
-              >
-                {showHealthCheck ? 'Hide System Status' : 'Show System Status'}
-              </button>
+          {/* Main Content - Two Column Layout */}
+          <div className="main-grid">
+            {/* Left Column - Input */}
+            <div className="input-column">
+              <div className="text-input-section">
+                <h2>Text to Synthesize</h2>
+                <textarea
+                  className="text-input"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Type Hindi text here or select a sample sentence below..."
+                  rows={5}
+                />
+                
+                <div className="speaker-selection">
+                  <label htmlFor="speaker-select">Voice:</label>
+                  <select 
+                    id="speaker-select"
+                    value={speakerId}
+                    onChange={(e) => setSpeakerId(e.target.value)}
+                  >
+                    <option value="aisha">Aisha</option>
+                  </select>
+                </div>
+                
+                <div className="advanced-toggle">
+                  <button
+                    className={`toggle-button ${advancedOptions ? 'active' : ''}`}
+                    onClick={() => setAdvancedOptions(!advancedOptions)}
+                  >
+                    {advancedOptions ? 'Hide Parameters' : 'Show Parameters'}
+                  </button>
+                </div>
+                
+                {advancedOptions && (
+                  <div className="advanced-options">
+                    <div className="param-grid">
+                      <div className="param-group">
+                        <label htmlFor="max-tokens">Max Tokens: <span className="value-display">{maxNewTokens}</span></label>
+                        <input
+                          id="max-tokens"
+                          type="range"
+                          min="100"
+                          max="4096"
+                          step="1"
+                          value={maxNewTokens}
+                          onChange={(e) => setMaxNewTokens(parseInt(e.target.value))}
+                        />
+                      </div>
+                      
+                      <div className="param-group">
+                        <label htmlFor="temperature">Temperature: <span className="value-display">{temperature.toFixed(2)}</span></label>
+                        <input
+                          id="temperature"
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="0.05"
+                          value={temperature}
+                          onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                        />
+                      </div>
+                      
+                      <div className="param-group">
+                        <label htmlFor="top-p">Top P: <span className="value-display">{topP.toFixed(2)}</span></label>
+                        <input
+                          id="top-p"
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={topP}
+                          onChange={(e) => setTopP(parseFloat(e.target.value))}
+                        />
+                      </div>
+                      
+                      <div className="param-group">
+                        <label htmlFor="repetition-penalty">Repetition Penalty: <span className="value-display">{repetitionPenalty.toFixed(2)}</span></label>
+                        <input
+                          id="repetition-penalty"
+                          type="range"
+                          min="1"
+                          max="2"
+                          step="0.05"
+                          value={repetitionPenalty}
+                          onChange={(e) => setRepetitionPenalty(parseFloat(e.target.value))}
+                        />
+                      </div>
+                      
+                      <div className="param-group">
+                        <label htmlFor="speed-adjustment">Speed: <span className="value-display">{speedAdjustment.toFixed(2)}x</span></label>
+                        <input
+                          id="speed-adjustment"
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.05"
+                          value={speedAdjustment}
+                          onChange={(e) => setSpeedAdjustment(parseFloat(e.target.value))}
+                        />
+                      </div>
+                      
+                      <div className="param-group">
+                        <label htmlFor="audio-quality">Audio Quality:</label>
+                        <select
+                          id="audio-quality"
+                          value={audioQualityPreset}
+                          onChange={(e) => setAudioQualityPreset(e.target.value)}
+                        >
+                          <option value="low">Low (16kHz)</option>
+                          <option value="medium">Medium (24kHz)</option>
+                          <option value="high">High (24kHz, best quality)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="generate-button-container">
+                  <button
+                    className="generate-button"
+                    onClick={generateSpeech}
+                    disabled={isGenerating || !text.trim()}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <span className="spinner"></span>
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate Speech"
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
             
-            {showHealthCheck && (
-              <div className="health-status">
-                <h3>System Status</h3>
-                {isHealthy === null ? (
-                  <div className="loading">Checking status...</div>
-                ) : (
+            {/* Right Column - Output */}
+            <div className="output-column">
+              <div className={`audio-output-section ${audioUrl ? 'active' : ''}`}>
+                <h2>Generated Audio</h2>
+                
+                {audioUrl ? (
                   <>
-                    <div className={`status-indicator ${isHealthy ? 'healthy' : 'unhealthy'}`}>
-                      {isHealthy ? 'System Operational' : 'System Experiencing Issues'}
+                    <div className="waveform-container" ref={waveformRef}></div>
+                    <div className="audio-controls">
+                      <audio ref={audioRef} controls>
+                        <source src={audioUrl} type="audio/wav" />
+                        Your browser does not support the audio element.
+                      </audio>
+                      <a
+                        href={audioUrl}
+                        download="maya_tts_output.wav"
+                        className="download-button"
+                      >
+                        Download Audio
+                      </a>
                     </div>
-                    
-                    {healthStatus && (
-                      <div className="status-details">
-                        <div className="status-item">
-                          <span className="status-label">Status:</span>
-                          <span className="status-value">{healthStatus.status || 'unknown'}</span>
-                        </div>
-                        
-                        {healthStatus.timestamp && (
-                          <div className="status-item">
-                            <span className="status-label">Last Updated:</span>
-                            <span className="status-value">
-                              {new Date(healthStatus.timestamp * 1000).toLocaleString()}
-                            </span>
-                          </div>
-                        )}
+                  </>
+                ) : (
+                  <div className="placeholder-container">
+                    {isGenerating ? (
+                      <div className="processing-indicator">
+                        <div className="large-spinner"></div>
+                        <div className="processing-text">Processing audio...</div>
+                      </div>
+                    ) : (
+                      <div className="placeholder-message">
+                        Generated audio visualization will appear here
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
+          
+          {/* Sample Sentences at Bottom */}
+          <div className="sample-sentences-section">
+            <h2>Sample Hindi Sentences</h2>
+            <div className="sentence-carousel">
+              {SAMPLE_HINDI_SENTENCES.map((sentence, index) => (
+                <div
+                  key={index}
+                  className="sample-pill"
+                  onClick={() => selectSampleSentence(sentence)}
+                >
+                  {sentence}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <footer className="minimal-footer">
+            <p>Built by <a href="https://www.dheemanthreddy.com/" target="_blank" rel="noopener noreferrer">Dheemanth Reddy</a> | <a href="https://www.linkedin.com/in/bharath-kumar92" target="_blank" rel="noopener noreferrer">Bharath Kumar</a></p>
+          </footer>
         </div>
-        
-        <footer className="app-footer">
-          <div className="footer-content">
-            <p>© 2023 Maya Research - Neural Text-to-Speech System</p>
-            <p>Powered by Orpheus and SNAC</p>
-          </div>
-        </footer>
       </div>
     </div>
   );
