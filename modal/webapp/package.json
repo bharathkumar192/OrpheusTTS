@@ -32,6 +32,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "https://fuchr--orpheus-tts-api-refined-v2-orpheusttsapi-run-fastapi-app.modal.run"
+  }
 } 

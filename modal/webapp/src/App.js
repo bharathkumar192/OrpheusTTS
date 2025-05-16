@@ -38,6 +38,7 @@ function App() {
   const [speedAdjustment, setSpeedAdjustment] = useState(1.0);
   const [audioQualityPreset, setAudioQualityPreset] = useState('high');
   const [isHealthy, setIsHealthy] = useState(null);
+  const [isWarmingUp, setIsWarmingUp] = useState(true);
   
   // Refs
   const waveformRef = useRef(null);
@@ -58,7 +59,7 @@ function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Initialize WaveSurfer
+  // Initialize WaveSurfer when audio URL changes
   useEffect(() => {
     if (audioUrl && waveformRef.current) {
       if (wavesurferRef.current) {
@@ -77,13 +78,27 @@ function App() {
         barGap: 3,
         responsive: true,
         normalize: true,
+        media: audioRef.current // Connect to audio element for better sync
       });
       
       wavesurfer.load(audioUrl);
       wavesurferRef.current = wavesurfer;
       
       wavesurfer.on('ready', () => {
-        wavesurfer.play();
+        // Wait a moment for the audio to be fully ready
+        setTimeout(() => {
+          if (audioRef.current) {
+            // Sync wavesurfer to audio element
+            audioRef.current.addEventListener('play', () => wavesurfer.play());
+            audioRef.current.addEventListener('pause', () => wavesurfer.pause());
+            audioRef.current.addEventListener('seeked', () => {
+              wavesurfer.seekTo(audioRef.current.currentTime / audioRef.current.duration);
+            });
+            
+            // Start playback
+            audioRef.current.play();
+          }
+        }, 100);
       });
     }
   }, [audioUrl]);
@@ -91,15 +106,30 @@ function App() {
   // Check API health status
   const checkHealth = async () => {
     try {
+      setIsWarmingUp(true);
       const response = await fetch(`${config.apiUrl}/health`);
       const data = await response.json();
       setHealthStatus(data);
       setIsHealthy(data.status === 'healthy');
+      setIsWarmingUp(false);
     } catch (error) {
       setHealthStatus({ error: error.message });
       setIsHealthy(false);
+      setIsWarmingUp(false);
     }
   };
+  
+  // Initial health check on page load to warm up the server
+  useEffect(() => {
+    checkHealth();
+  }, []);
+  
+  // Health check when toggle is clicked
+  useEffect(() => {
+    if (showHealthCheck && !isWarmingUp) {
+      checkHealth();
+    }
+  }, [showHealthCheck]);
   
   // Handle text generation
   const generateSpeech = async () => {
@@ -146,12 +176,6 @@ function App() {
     }
   };
   
-  useEffect(() => {
-    if (showHealthCheck) {
-      checkHealth();
-    }
-  }, [showHealthCheck]);
-  
   const selectSampleSentence = (sentence) => {
     setText(sentence);
   };
@@ -171,16 +195,16 @@ function App() {
             
             <div className="health-check-container">
               <button 
-                className={`health-toggle ${showHealthCheck ? 'active' : ''}`}
+                className={`health-toggle ${showHealthCheck ? 'active' : ''} ${isHealthy === true ? 'healthy-indicator' : ''}`}
                 onClick={() => setShowHealthCheck(!showHealthCheck)}
               >
-                System Status
+                {isWarmingUp ? 'Warming Up...' : (isHealthy ? 'Server Online' : 'Check Status')}
               </button>
               
               {showHealthCheck && (
                 <div className="health-dropdown">
-                  {isHealthy === null ? (
-                    <div className="loading">Checking status...</div>
+                  {isWarmingUp ? (
+                    <div className="loading">Fetching API Health...</div>
                   ) : (
                     <>
                       <div className={`status-indicator ${isHealthy ? 'healthy' : 'unhealthy'}`}>

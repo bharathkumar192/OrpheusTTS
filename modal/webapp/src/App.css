@@ -134,11 +134,34 @@ body, html {
   font-size: 0.9rem;
   cursor: pointer;
   transition: var(--transition-standard);
+  position: relative;
+  overflow: hidden;
 }
 
 .health-toggle:hover, .health-toggle.active {
   background-color: rgba(29, 185, 84, 0.15);
   border-color: rgba(29, 185, 84, 0.5);
+}
+
+.health-toggle.healthy-indicator {
+  background-color: rgba(29, 185, 84, 0.2);
+  border-color: var(--green-bright);
+  color: var(--green-bright);
+  font-weight: 500;
+}
+
+.health-toggle.healthy-indicator:before {
+  content: '•';
+  display: inline-block;
+  color: var(--green-bright);
+  margin-right: 5px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 .health-dropdown {
@@ -180,6 +203,26 @@ body, html {
   font-size: 0.8rem;
   color: var(--text-gray);
   text-align: center;
+}
+
+.loading {
+  text-align: center;
+  color: var(--text-gray);
+  padding: 0.5rem;
+  position: relative;
+}
+
+.loading:after {
+  content: "...";
+  animation: loadingDots 1.5s infinite;
+  position: absolute;
+  display: inline-block;
+}
+
+@keyframes loadingDots {
+  0% { content: "."; }
+  33% { content: ".."; }
+  66% { content: "..."; }
 }
 
 /* Main Grid Layout */
