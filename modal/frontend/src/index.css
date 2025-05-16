@@ -5,24 +5,15 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #eef2f5; /* Slightly off-white/light grey background */
+  background-color: #f4f7f6;
   color: #333;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Align to top to see shadow better */
+  align-items: center;
   min-height: 100vh;
-  padding-top: 20px; /* Add some top padding to body */
-  padding-bottom: 20px;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
-}
-
-#root {
-  width: 100%;
-  max-width: 800px; /* Limit overall width */
-  padding: 0 20px; /* Horizontal padding for smaller screens */
-  box-sizing: border-box;
 }

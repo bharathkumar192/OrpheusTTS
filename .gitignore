@@ -1,6 +1,6 @@
 downloaded_dataset_raw/*
 processed/*
-node_modules/*
+node_modules
 .env
 .env.local
 .env.development.local
@@ -8,3 +8,5 @@ node_modules/*
 .env.production.local
 .env.development
 .env.test
+/Users/bharath/Documents/Latest_multispeaker/modal/frontend/node_modules
+build/*
