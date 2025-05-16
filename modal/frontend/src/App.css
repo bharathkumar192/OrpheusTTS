@@ -1,4 +1,4 @@
-/* App.css - Maya Research - Veena TTS Demo - Stunning Edition */
+/* App.css - Maya Research - Veena TTS Demo - Regular Full Screen */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;700&family=Poppins:wght@300;400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap');
 
@@ -31,9 +31,8 @@
 }
 
 html, body {
-  height: 100%;
-  width: 100%;
-  overflow: hidden; /* Prevent scrollbars from body, content-wrapper will handle scroll */
+  /* Remove fixed height and overflow: hidden to allow natural scrolling */
+  width: 100%; 
 }
 
 body {
@@ -44,34 +43,37 @@ body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0; /* Ensure no default body margin */
 }
 
 .App {
-  height: 100vh;
-  width: 100vw;
-  display: flex; /* Needed for background to be behind content-wrapper */
-  position: relative; /* For z-indexing background */
+  /* .App is the root React component's div */
+  min-height: 100vh; /* Ensure it fills at least the viewport height */
+  display: flex;
+  flex-direction: column; /* To allow header, main, footer stacking */
   opacity: 0;
   animation: fadeInApp 0.5s var(--transition-speed) ease-out forwards;
+  position: relative; /* Keep for z-indexing if background animation is re-enabled */
 }
 
 @keyframes fadeInApp {
   to { opacity: 1; }
 }
 
+/*
 .background-animation {
-  position: absolute;
+  position: fixed; 
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  z-index: 0;
+  z-index: -1; 
 }
 
 .background-animation .line {
   position: absolute;
-  bottom: 0; /* Start from bottom */
+  bottom: 0;
   width: 1px;
   background: linear-gradient(to top, rgba(54, 255, 77, 0), var(--neon-green-dim), rgba(54, 255, 77, 0.4));
   opacity: 0;
@@ -84,31 +86,34 @@ body {
   100% { transform: translateY(-100vh); opacity: 0; }
 }
 @keyframes fadeInLine { to { opacity: initial; }}
+*/
 
-
+/* .content-wrapper is no longer strictly necessary for full-screen scroll management
+   if .App itself handles the flex column layout.
+   However, keeping it allows for a clear separation of main content
+   and applying overall padding easily. */
 .content-wrapper {
-  position: relative;
-  z-index: 1;
   width: 100%;
-  height: 100%;
-  overflow-y: auto; /* Enable scrolling for content */
-  padding: 0 40px; /* Main horizontal padding */
+  flex-grow: 1; /* Allows main content to take available space */
   display: flex;
   flex-direction: column;
+  padding: 0 20px; /* Reduced default horizontal padding, can adjust */
+  max-width: 1600px; /* Optional: max width for very large screens */
+  margin: 0 auto;    /* Center the content wrapper itself */
 }
 
 
 .App-header {
   text-align: center;
-  padding: 80px 20px 50px;
+  padding: 60px 0 40px; /* Padding inside content-wrapper */
   border-bottom: 1px solid var(--mid-gray);
-  margin-bottom: 50px;
+  margin-bottom: 40px;
   animation: slideDown 0.5s ease-out;
 }
 
 .App-header h1 {
   font-family: var(--font-heading);
-  font-size: clamp(2.5rem, 6vw, 4rem); 
+  font-size: clamp(2.2rem, 5vw, 3.5rem); 
   color: var(--neon-green);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -118,18 +123,18 @@ body {
 }
 
 .App-header p {
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-size: clamp(1rem, 2vw, 1.15rem);
   font-weight: 300;
   color: var(--soft-white);
   opacity: 0.9;
 }
 
 .App-main {
-  flex-grow: 1;
+  flex-grow: 1; /* Main content area takes up remaining vertical space */
   width: 100%;
-  max-width: 1400px; /* Slightly wider max for content */
-  margin: 0 auto; /* Center content area */
-  animation: fadeInUp 0.5s 0.2s ease-out backwards; /* Delay fadeInUp */
+  /* max-width: 1400px; /* This can be on .content-wrapper instead */
+  /* margin: 0 auto; /* This can be on .content-wrapper instead */
+  animation: fadeInUp 0.5s 0.2s ease-out backwards; 
 }
 
 @keyframes slideDown {
@@ -144,18 +149,19 @@ body {
 
 .tts-container {
   display: flex;
-  gap: 50px;
-  margin-bottom: 50px;
+  gap: 40px; /* Reduced gap slightly */
+  margin-bottom: 40px;
 }
 
 .tts-controls-column {
-  flex: 0 0 40%;
-  max-width: 40%;
+  flex: 1 1 450px; /* Allow shrinking but prefer 450px */
+  max-width: 500px; /* Limit max width */
+  min-width: 300px; /* Ensure it doesn't get too squished */
 }
 
 .tts-controls-column h2 {
   font-family: var(--font-heading);
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
   color: var(--neon-green);
   margin-bottom: 0.75rem;
   text-transform: uppercase;
@@ -164,22 +170,22 @@ body {
 }
 
 .tagline {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: var(--soft-white);
   opacity: 0.85;
-  margin-bottom: 35px;
+  margin-bottom: 30px;
 }
 
 .tts-form .form-group {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
 }
 
 .tts-form label {
   display: block;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--soft-white);
   opacity: 0.75;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -188,28 +194,28 @@ body {
 .styled-select,
 .text-input {
   width: 100%;
-  padding: 14px 18px;
+  padding: 12px 15px;
   background-color: var(--dark-gray);
   border: 1px solid var(--mid-gray);
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--soft-white);
   font-family: var(--font-body);
   font-size: 1rem;
   transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
 }
 
 .styled-select {
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2336ff4d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
-  background-position: right 18px center;
-  background-size: 1.1em;
+  background-position: right 15px center;
+  background-size: 1em;
 }
 
 .text-input {
   resize: vertical;
-  min-height: 120px;
+  min-height: 110px;
   font-family: var(--font-devanagari);
 }
 
@@ -217,39 +223,39 @@ body {
 .text-input:focus {
   outline: none;
   border-color: var(--neon-green);
-  box-shadow: 0 0 0 3px var(--neon-green-dim), inset 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 3px var(--neon-green-dim), inset 0 1px 2px rgba(0,0,0,0.25);
 }
 
 .generate-button {
   width: 100%;
-  padding: 18px 30px;
+  padding: 16px 25px;
   font-family: var(--font-heading);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 500;
   color: var(--primary-bg);
   background-color: var(--neon-green);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color var(--transition-speed) ease, transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  box-shadow: 0 0 var(--glow-blur) var(--neon-green-dim);
+  box-shadow: 0 0 calc(var(--glow-blur)/1.5) var(--neon-green-dim);
 }
 
 .generate-button:hover:not(:disabled) {
   background-color: #2ce043;
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 5px var(--glow-blur) var(--neon-green-transparent);
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 4px var(--glow-blur) var(--neon-green-transparent);
 }
 
 .generate-button:active:not(:disabled) {
-  transform: translateY(-1px) scale(1);
-  box-shadow: 0 2px calc(var(--glow-blur)/2) var(--neon-green-transparent);
+  transform: translateY(0px) scale(1);
+  box-shadow: 0 1px calc(var(--glow-blur)/3) var(--neon-green-transparent);
 }
 
 .generate-button:disabled {
@@ -269,45 +275,46 @@ body {
 }
 
 .tts-player-column {
-  flex: 1;
-  display: flex; /* For centering glass-card */
-  align-items: center; /* For centering glass-card */
-  justify-content: center; /* For centering glass-card */
+  flex: 1 1 50%; /* Allow more flexible growth */
+  display: flex;
+  align-items: center; 
+  justify-content: center;
+  min-width: 300px; /* Ensure player column doesn't get too small */
 }
 
 .glass-card {
-  background: rgba(15, 15, 15, 0.6); /* Darker, more subtle glass */
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  background: rgba(20, 20, 20, 0.65); 
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid var(--mid-gray);
-  border-radius: 20px;
-  padding: 35px 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 15px var(--neon-green-dim); /* Added neon glow */
+  border-radius: 16px;
+  padding: 30px 35px;
+  box-shadow: 0 8px 35px rgba(0, 0, 0, 0.4), 0 0 12px var(--neon-green-dim);
   width: 100%;
-  max-width: 700px; /* Max width for player card */
-  min-height: 380px; /* Ensure it has some height */
+  max-width: 650px; 
+  min-height: 360px; 
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Pushes quality notice down if present */
+  justify-content: space-between; 
 }
 
 .sentence-display {
   font-family: var(--font-devanagari);
-  font-size: clamp(1.25rem, 2.8vw, 1.75rem);
+  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
   color: var(--soft-white);
-  margin-bottom: 25px;
+  margin-bottom: 20px;
   text-align: center;
-  min-height: 80px;
+  min-height: 70px;
   line-height: 1.5;
   font-weight: 500;
 }
 
 #waveform {
   width: 100%;
-  height: 100px; /* Fixed height for waveform */
-  margin-bottom: 25px;
+  height: 90px; 
+  margin-bottom: 20px;
   border-radius: 5px;
-  background-color: rgba(0,0,0,0.2); /* Slight background for waveform area */
+  background-color: rgba(0,0,0,0.15); 
   border: 1px solid var(--mid-gray);
 }
 
@@ -317,7 +324,7 @@ body {
   justify-content: space-between;
   gap: 15px;
   width: 100%;
-  margin-top: 15px; /* Space above controls footer */
+  margin-top: 10px; 
 }
 
 .play-pause-button,
@@ -325,24 +332,24 @@ body {
   background-color: transparent;
   border: 2px solid var(--neon-green);
   color: var(--neon-green);
-  width: 55px;
-  height: 55px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-speed) ease;
-  font-size: 1.4rem;
-  box-shadow: 0 0 calc(var(--glow-blur)/2) var(--neon-green-dim);
+  font-size: 1.3rem;
+  box-shadow: 0 0 calc(var(--glow-blur)/2.5) var(--neon-green-dim);
 }
 
 .play-pause-button:hover:not(:disabled),
 .download-button:hover:not(:disabled) {
   background-color: var(--neon-green);
   color: var(--primary-bg);
-  transform: scale(1.1);
-  box-shadow: 0 0 var(--glow-blur) var(--neon-green-transparent);
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(var(--glow-blur)/1.5) var(--neon-green-transparent);
 }
 
 .play-pause-button:disabled,
@@ -354,7 +361,7 @@ body {
 }
 
 .time-indicators-footer {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--soft-white);
   opacity: 0.8;
   font-family: var(--font-heading);
@@ -367,9 +374,9 @@ body {
   color: var(--soft-white);
   opacity: 0.6;
   font-style: italic;
-  margin: 40px 0;
-  min-height: 50px;
-  font-size: 1.1rem;
+  margin: 35px 0;
+  min-height: 45px;
+  font-size: 1rem;
 }
 
 
@@ -377,12 +384,12 @@ body {
   background-color: var(--error-bg);
   color: var(--error-text);
   border: 1px solid var(--error-text);
-  padding: 18px;
-  border-radius: 10px;
-  margin-bottom: 25px;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
   text-align: left;
-  font-size: 0.95rem;
-  box-shadow: 0 0 10px rgba(255,85,85,0.3);
+  font-size: 0.9rem;
+  box-shadow: 0 0 8px rgba(255,85,85,0.25);
 }
 
 .error-message strong {
@@ -394,18 +401,18 @@ body {
 .section-separator {
   height: 1px;
   background: linear-gradient(to right, transparent, var(--neon-green), transparent);
-  margin: 60px auto; /* Centered */
-  opacity: 0.8;
-  width: 70%;
-  box-shadow: 0 0 10px var(--neon-green-dim);
+  margin: 50px auto; 
+  opacity: 0.7;
+  width: 60%;
+  box-shadow: 0 0 8px var(--neon-green-dim);
 }
 
 .secondary-content {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 35px;
-  padding: 30px 0;
+  gap: 30px;
+  padding: 25px 0;
   flex-wrap: wrap;
   animation: fadeInUp 0.5s 0.4s ease-out backwards;
 }
@@ -413,19 +420,19 @@ body {
 .secondary-link,
 .github-button {
   font-family: var(--font-heading);
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--neon-green);
   text-decoration: none;
-  padding: 12px 25px;
+  padding: 10px 20px;
   border: 1px solid var(--neon-green);
   border-radius: 8px;
   transition: all var(--transition-speed) ease;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  box-shadow: 0 0 calc(var(--glow-blur)/3) var(--neon-green-dim);
+  box-shadow: 0 0 calc(var(--glow-blur)/3.5) var(--neon-green-dim);
 }
 
 .secondary-link:hover,
@@ -434,59 +441,71 @@ body {
   color: var(--soft-white);
   border-color: var(--neon-green-transparent);
   transform: translateY(-2px);
-  box-shadow: 0 3px var(--glow-blur) var(--neon-green-transparent);
+  box-shadow: 0 2px calc(var(--glow-blur)/2) var(--neon-green-transparent);
 }
 
 .App-footer {
   text-align: center;
-  padding: 40px 0 30px;
-  font-size: 0.9rem;
+  padding: 35px 0 25px;
+  font-size: 0.85rem;
   color: var(--soft-white);
   opacity: 0.6;
   font-family: var(--font-heading);
   letter-spacing: 0.03em;
   animation: fadeInUp 0.5s 0.6s ease-out backwards;
+  margin-top: auto; /* Pushes footer to bottom if content is short */
 }
 
 /* Responsive Adjustments */
-@media (max-width: 1024px) {
+@media (max-width: 900px) { /* Adjusted breakpoint */
   .content-wrapper {
-    padding: 0 20px;
+    padding: 0 15px; /* Slightly less padding on smaller content-wrapper */
   }
   .tts-container {
     flex-direction: column;
-    gap: 40px;
+    gap: 30px;
   }
   .tts-controls-column,
   .tts-player-column {
-    max-width: 100%;
+    max-width: 100%; /* Allow full width when stacked */
     flex-basis: auto;
+    min-width: 0; /* Reset min-width for stacking */
   }
   .tts-player-column {
-    margin-top: 0; /* No extra margin as it's centered now */
-    align-items: stretch; /* Let glass card take width */
+     align-items: stretch; 
   }
   .glass-card {
-    max-width: none; /* Allow it to be wider on tablet */
-    padding: 30px;
+    padding: 25px;
+    min-height: 340px;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .App-header {
-    padding: 60px 10px 40px;
+    padding: 40px 0 30px;
+    margin-bottom: 30px;
   }
   .App-header h1 {
     letter-spacing: 0.15em;
+    font-size: clamp(1.8rem, 6vw, 2.5rem);
+  }
+   .App-header p {
+    font-size: clamp(0.9rem, 2.5vw, 1rem);
   }
   .tagline {
-    font-size: 1rem;
+    font-size: 0.95rem;
+    margin-bottom: 25px;
+  }
+   .tts-controls-column h2 {
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
   }
   .sentence-display {
-    min-height: 60px;
+    font-size: clamp(1.1rem, 2.8vw, 1.4rem);
+    min-height: 50px;
   }
   #waveform {
-    height: 80px;
+    height: 70px;
+    margin-bottom: 15px;
   }
   .audio-player-controls-footer {
     flex-wrap: wrap;
@@ -494,34 +513,39 @@ body {
     gap: 10px;
   }
   .play-pause-button, .download-button {
-    width: 50px;
-    height: 50px;
-    font-size: 1.2rem;
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
   }
   .time-indicators-footer {
     width: 100%;
     text-align: center;
-    order: -1; /* Move time above buttons on wrap */
-    margin-bottom: 10px;
+    order: -1; 
+    margin-bottom: 8px;
+    font-size: 0.8rem;
   }
   .secondary-content {
-    gap: 20px;
+    gap: 15px;
+    padding: 20px 0;
+  }
+  .section-separator {
+    margin: 40px auto;
+    width: 80%;
   }
 }
 
 
-/* Custom scrollbar for webkit browsers within content-wrapper */
-.content-wrapper::-webkit-scrollbar {
-  width: 10px;
+/* Custom scrollbar for webkit browsers (applied to body now) */
+body::-webkit-scrollbar {
+  width: 8px;
 }
-.content-wrapper::-webkit-scrollbar-track {
+body::-webkit-scrollbar-track {
   background: var(--dark-gray);
 }
-.content-wrapper::-webkit-scrollbar-thumb {
+body::-webkit-scrollbar-thumb {
   background: var(--mid-gray);
-  border-radius: 5px;
-  border: 2px solid var(--dark-gray); /* Create a 'padding' effect */
+  border-radius: 4px;
 }
-.content-wrapper::-webkit-scrollbar-thumb:hover {
+body::-webkit-scrollbar-thumb:hover {
   background: var(--neon-green);
 }
