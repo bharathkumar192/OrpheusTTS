@@ -1,0 +1,72 @@
+# config.yaml (FOR AISHA - "VERY GOOD" VERIFICATION RUN on 2xH200 SXM)
+
+# --- Dataset and Model ---
+TTS_dataset: "bharathkumar1922001/hindi-tts-aisha-Filtered-aisha" # Output from your latest preprocess.py
+model_name: "canopylabs/3b-hi-pretrain-research_release"
+
+# --- Speaker Filtering ---
+speakers_to_train:
+  - "anika"
+  - "ivanna"
+
+# --- Training Arguments ---
+epochs: 20 # Increased for a more thorough run to ensure learning.
+           # Can go up to 15-20 if loss is still decreasing well.
+per_device_train_batch_size: 16 # With H200 VRAM, you can likely go much higher. Start with 16.
+                                # Max possible might be 24 or even 32 if using gradient_checkpointing.
+                                # Test with 16, then try 20, 24 if no OOM.
+gradient_accumulation_steps: 2  # Target Global Effective BS = 16 * 2 * 2 = 64
+                                # If per_device_bs=24, GAS=1 -> GlobalEffBS=48
+                                # If per_device_bs=24, GAS=2 -> GlobalEffBS=96 (Good target)
+
+pad_token: 128263
+learning_rate: 3.0e-5 # Slightly lower can be good for stability, but 5e-5 is also fine.
+                      # Consider a cosine schedule that decays to a lower value.
+weight_decay: 0.01
+# For 19853 samples, GlobalEffBS=64 (e.g., per_dev_bs=16, gas=2, 2 gpus)
+# Steps/epoch = 19853 / 64 = ~310 steps.
+# Total steps for 10 epochs = ~3100 steps.
+warmup_steps: 300 # ~5% of total steps for 10 epochs. Adjust if epochs change.
+lr_scheduler_type: "cosine" # Cosine decay is often good for longer runs.
+
+# --- Saving and Logging ---
+save_strategy: "steps"
+# save_steps: 300 # Save roughly once per epoch with ~310 steps/epoch.
+save_steps: 800 # Or a bit less frequent if disk space/time is a concern.
+save_total_limit: 3 # Keep last 2 + best (if eval implemented) or just last 3.
+logging_steps: 100
+logging_first_step: true
+
+# --- Dataset Subsetting ---
+num_train_samples: -1 # Use all available ~19,853 samples for "aisha".
+
+# --- Data Sanity Check ---
+perform_data_check: true
+num_samples_to_check: 5 # More samples for sanity check if you want more confidence.
+
+# --- Advanced Training Options ---
+gradient_checkpointing: true # DEFINITELY USE THIS. It allows much larger batch sizes by trading compute for memory.
+bf16: true # H200 supports bf16 excellently.
+# fp16: false # Not needed if bf16 is true and supported.
+
+# --- Naming and Paths for this Run ---
+save_folder: "checkpoints_aisha_H200_good_run_v1"
+project_name: "FT-orpheus-aisha-H200"
+run_name: "aisha-H200-bs16x2x2-lr3e-5-gc-ep10" # bs<per_dev>x<gas>x<num_gpus>
+
+# --- Hugging Face Hub Push Configuration ---
+push_to_hub: true
+hub_model_id: "bharathkumar1922001/orpheus-3b-hi-aisha-H200-v1" # New model ID for this good run
+hub_private_repo: true
+
+
+
+# --- Callback: Test Sample Generation ---
+generate_test_samples_on_save: true # Enable generation on checkpoint save
+generate_test_samples_every_n_steps: 1000 # Generate every N steps (e.g., 1000). Set to 0 or null to disable step-based generation.
+# generate_test_samples_every_n_steps: null # Alternative to disable
+test_generation_prompts: # List of prompts to generate
+  - "नमस्ते, आप कैसे हैं?"
+  - "आज का मौसम बहुत अच्छा है।"
+  - "यह एक परीक्षण नमूना है।"
+target_speaker_for_generation: "aisha" 
