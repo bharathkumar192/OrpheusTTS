@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import WaveSurfer from 'wavesurfer.js';
 import './App.css';
-import { FaPlay, FaPause, FaDownload, FaSpinner, FaExclamationTriangle, FaGithub } from 'react-icons/fa';
+import { FaPlay, FaPause, FaDownload, FaSpinner, FaExclamationTriangle } from 'react-icons/fa'; // Keep FaGithub if used
 import { FiExternalLink } from 'react-icons/fi';
 
 // --- Configuration ---
-const API_ENDPOINT = process.env.REACT_APP_TTS_API_ENDPOINT;
+const API_ENDPOINT = process.env.REACT_APP_TTS_API_ENDPOINT || 'https://fuchr--orpheus-tts-api-refined-v2-orpheusttsapi-run-fastapi-app.modal.run'; // Replace with your actual endpoint
 const VEENA_SPEAKER_ID = 'aisha';
 
 const PRESET_SENTENCES = [
@@ -30,9 +30,9 @@ function App() {
   const [duration, setDuration] = useState("00:00");
   const [currentTime, setCurrentTime] = useState("00:00");
 
-  const waveformRef = useRef(null); // For WaveSurfer container
-  const wavesurfer = useRef(null); // For WaveSurfer instance
-  const audioRef = useRef(new Audio()); // Use a detached Audio element for playback control
+  const waveformRef = useRef(null);
+  const wavesurfer = useRef(null);
+  const audioControlRef = useRef(new Audio()); // Renamed for clarity, this is our control audio element
 
   useEffect(() => {
     if (!API_ENDPOINT) {
@@ -42,6 +42,7 @@ function App() {
   }, []);
   
   const formatTime = (time) => {
+    if (isNaN(time) || time === Infinity) return "00:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -52,49 +53,40 @@ function App() {
     if (waveformRef.current && !wavesurfer.current) {
       wavesurfer.current = WaveSurfer.create({
         container: waveformRef.current,
-        waveColor: 'rgba(54, 255, 77, 0.3)', // Neon green with transparency
-        progressColor: '#36ff4d', // Solid neon green
+        waveColor: 'rgba(54, 255, 77, 0.3)',
+        progressColor: '#36ff4d',
         cursorColor: '#ffffff',
         barWidth: 3,
         barRadius: 3,
         responsive: true,
         height: 100,
         normalize: true,
-        backend: 'MediaElement', // Use MediaElement backend with our audioRef
+        // Provide the audio element that WaveSurfer will control for playback
+        media: audioControlRef.current, 
       });
-
-      // Sync WaveSurfer with the detached audio element
-      wavesurfer.current.loadElement(audioRef.current, audioBlob ? [audioBlob] : undefined);
-
 
       wavesurfer.current.on('ready', () => {
-        if (audioRef.current) {
-          setDuration(formatTime(audioRef.current.duration));
-          // Auto-play after ready and blob is set
-          if(audioBlob) {
-            audioRef.current.play().catch(e => console.warn("Audio autoplay prevented:", e));
-          }
+        // Duration is now available from the controlled media element
+        setDuration(formatTime(wavesurfer.current.getDuration()));
+        // Auto-play if a blob was just loaded
+        if (audioBlob && wavesurfer.current) { // Check audioBlob again here
+          wavesurfer.current.play().catch(e => console.warn("Audio autoplay prevented on ready:", e));
         }
       });
 
-      wavesurfer.current.on('audioprocess', () => {
-        if (audioRef.current) {
-          setCurrentTime(formatTime(audioRef.current.currentTime));
-        }
+      wavesurfer.current.on('audioprocess', (time) => {
+        setCurrentTime(formatTime(time));
       });
       
-      wavesurfer.current.on('interaction', () => {
-         if (audioRef.current && wavesurfer.current) {
-            audioRef.current.currentTime = wavesurfer.current.getCurrentTime();
-         }
-      });
+      // No need for 'interaction' listener if media is correctly linked,
+      // WaveSurfer handles seeking on the media element.
 
       wavesurfer.current.on('play', () => setIsPlaying(true));
       wavesurfer.current.on('pause', () => setIsPlaying(false));
       wavesurfer.current.on('finish', () => {
         setIsPlaying(false);
-        wavesurfer.current.seekTo(0); // Reset to beginning
-        setCurrentTime("00:00");
+        wavesurfer.current.seekTo(0);
+        setCurrentTime("00:00"); // Reset current time display
       });
     }
 
@@ -105,27 +97,24 @@ function App() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount to setup WaveSurfer container
+  }, []); // audioBlob removed from dependencies here, as loading is handled in the next effect
 
-   // Load audio blob into WaveSurfer and Audio element
+   // Load audio blob into WaveSurfer and the controlled Audio element
    useEffect(() => {
     if (audioBlob && wavesurfer.current) {
       const audioUrl = URL.createObjectURL(audioBlob);
-      audioRef.current.src = audioUrl; // Set src for the detached audio element
+      // audioControlRef.current.src = audioUrl; // WaveSurfer's load will handle this for its media element
+      wavesurfer.current.load(audioUrl); // This also sets the src on audioControlRef.current
       
-      // Wavesurfer needs to be reloaded with the new audio element context if src changes
-      // Or, if it's already loaded with the element, just playing it should be fine.
-      // Let's ensure it's loaded with the blob data directly if possible.
-      wavesurfer.current.load(audioUrl);
-
       return () => {
         URL.revokeObjectURL(audioUrl);
       };
     } else if (!audioBlob && wavesurfer.current) {
-        // Clear waveform if no audio blob
         wavesurfer.current.empty();
+        audioControlRef.current.src = ""; // Clear src of our audio element too
         setDuration("00:00");
         setCurrentTime("00:00");
+        setIsPlaying(false);
     }
   }, [audioBlob]);
 
@@ -159,7 +148,11 @@ function App() {
 
     setIsLoading(true);
     setError(null);
-    setAudioBlob(null); // This will trigger useEffect to clear WaveSurfer
+    // Setting audioBlob to null will trigger the useEffect above to clear WaveSurfer
+    if (wavesurfer.current && wavesurfer.current.isPlaying()) {
+        wavesurfer.current.stop();
+    }
+    setAudioBlob(null); 
     setIsPlaying(false);
     setCurrentTime("00:00");
     setDuration("00:00");
@@ -181,30 +174,34 @@ function App() {
         timeout: 90000,
       });
       setAudioBlob(new Blob([response.data], { type: 'audio/wav' }));
-    } catch (err) {
+    } catch (err)  {
       console.error('API Error:', err);
-      let errorMessage = 'An unexpected error occurred.';
+      let errorMessageText = 'An unexpected error occurred during TTS generation.';
       if (err.response) {
-        try {
-          const errorDataText = await err.response.data.text();
-          const errorJson = JSON.parse(errorDataText);
-          errorMessage = errorJson.error || errorJson.detail || `Server error: ${err.response.status}`;
-        } catch (parseError) {
-          errorMessage = `Server error: ${err.response.status} ${err.response.statusText || ''}`;
-        }
+          if (err.response.data instanceof Blob) {
+              try {
+                  const errorBlobText = await err.response.data.text();
+                  const errorJson = JSON.parse(errorBlobText);
+                  errorMessageText = errorJson.error || errorJson.detail || `Server error: ${err.response.status}`;
+              } catch (e) {
+                  errorMessageText = `Server error: ${err.response.status}. Could not parse error response.`;
+              }
+          } else {
+              errorMessageText = err.response.data.error || err.response.data.detail || `Server error: ${err.response.status}`;
+          }
       } else if (err.request) {
-        errorMessage = 'No response from server.';
-      } else {
-        errorMessage = err.message;
+          errorMessageText = 'No response from the server. It might be down or unreachable.';
+      } else if (err.message) {
+          errorMessageText = err.message;
       }
-      setError(errorMessage);
+      setError(errorMessageText);
     } finally {
       setIsLoading(false);
     }
   };
 
   const togglePlayPause = useCallback(() => {
-    if (wavesurfer.current && audioBlob) {
+    if (wavesurfer.current && audioBlob) { // Ensure audioBlob is present
       wavesurfer.current.playPause();
     }
   }, [audioBlob]);
@@ -226,7 +223,6 @@ function App() {
   return (
     <div className="App">
       <div className="background-animation">
-        {/* Lines for background effect - can be generated dynamically or be static SVGs */}
         {Array.from({ length: 50 }).map((_, i) => (
           <div className="line" key={i} style={{
             left: `${Math.random() * 100}%`,
@@ -306,20 +302,19 @@ function App() {
                   </div>
                 )}
                 
-                <div className="sentence-display" title="Phonetic transcription could appear here on hover.">
+                <div className="sentence-display" title="Synthesized text appears here.">
                   {text || "Your synthesized text will appear here."}
                 </div>
                 
                 <div id="waveform" ref={waveformRef}></div>
                 
-                {/* Controls below waveform */}
                 {(audioBlob || isLoading) && (
                   <div className="audio-player-controls-footer">
                      <button 
                         onClick={togglePlayPause} 
                         className="play-pause-button" 
                         aria-label={isPlaying ? "Pause" : "Play"}
-                        disabled={!audioBlob || isLoading}
+                        disabled={!audioBlob || isLoading} // Disable if no blob or loading
                     >
                         {isPlaying ? <FaPause /> : <FaPlay />}
                     </button>
@@ -350,12 +345,15 @@ function App() {
         <div className="section-separator"></div>
 
         <section className="secondary-content">
-          <a href="https://huggingface.co/spaces/sahilp/Hindi_TTS" target="_blank" rel="noopener noreferrer" className="secondary-link"> {/* Example link */}
-            Model Comparison <FiExternalLink />
+          {/* Ensure you have FaGithub imported if you use it here */}
+          <a href="https://mayaresearch.ai" target="_blank" rel="noopener noreferrer" className="secondary-link">
+            Maya Research <FiExternalLink />
           </a>
-          <a href="https://github.com/gitgithan/ModalTTS" target="_blank" rel="noopener noreferrer" className="github-button"> {/* Example link */}
-            <FaGithub /> Contribute on GitHub
-          </a>
+           {/* If you want a GitHub link:
+           <a href="https://github.com/your-repo" target="_blank" rel="noopener noreferrer" className="github-button">
+             <FaGithub /> Contribute on GitHub
+           </a>
+           */}
         </section>
 
         <footer className="App-footer">
