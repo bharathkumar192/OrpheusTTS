@@ -6,7 +6,7 @@ import random
 from collections import Counter
 
 # --- Configuration ---
-PROCESSED_DATASET_ID = "bharathkumar1922001/aisha-asmr-zadok-anika-ivanna-raju-sia-sangeeta-"  # UPDATE THIS!
+PROCESSED_DATASET_ID = "maya-research/Multi-speaker-TTS"  # UPDATE THIS!
 
 # Tokenizer used during preprocessing (for decoding text segments)
 ORPHEUS_TOKENIZER_NAME = "canopylabs/3b-hi-pretrain-research_release"

@@ -13,16 +13,17 @@ import yaml
 import multiprocessing # Import multiprocessing to get cpu count
 import time # For basic timing/debugging if needed
 import gc
+import argparse
 
 
 # --- Configuration ---
 CONFIG_FILE_PATH_FOR_PREPROCESS = "config.yaml"
-# IMPORTANT: Verify this path. If download.py saves to "downloaded_dataset_raw", 
-# and the dataset files (parquet, dataset_info.json) are directly in it,
-# then LOCAL_RAW_DATASET_DIR should be that path, not with "/data" unless that's intended.
-LOCAL_RAW_DATASET_DIR = "/workspace/orpheus/downloaded_dataset_raw/data" 
-DOWNLOADED_DATASET_REPO_ID_FOR_INFO_ONLY = "bharathkumar1922001/hindi-tts-multi-speaker"
-PROCESSED_HF_DATASET_REPO_FOR_UPLOAD = "bharathkumar1922001/aisha-asmr-zadok-anika" # Base name
+# Updated to use dataset ID instead of local path
+DATASET_REPO_ID = "maya-research/Multi-speaker-TTS"
+# Local path for downloaded dataset (only used if not loading directly from HF)
+LOCAL_RAW_DATASET_DIR = os.path.join(os.getcwd(), "downloaded_dataset_raw")
+DOWNLOADED_DATASET_REPO_ID_FOR_INFO_ONLY = "maya-research/Multi-speaker-TTS"
+PROCESSED_HF_DATASET_REPO_FOR_UPLOAD = "bharathkumar1922001/2-speaker-shayana-raju" # Base name
 
 ORPHEUS_TOKENIZER_NAME = "canopylabs/3b-hi-pretrain-research_release"
 SNAC_MODEL_NAME = "hubertsiuzdak/snac_24khz"
@@ -325,25 +326,27 @@ def process_specified_speakers_from_hf_format(hf_dataset_dir_path, speakers_to_p
     global device, text_tokenizer, snac_model, CPU_MAP_NUM_WORKERS, CPU_MAP_BATCH_SIZE
     if not speakers_to_process_now:
         print("No new speakers specified for processing in process_specified_speakers_from_hf_format."); return None
-    print(f"\n--- Loading Full Dataset from HF Format Directory: {hf_dataset_dir_path} ---")
+    print(f"\n--- Loading Full Dataset from HF ---")
     try:
-        dataset_full_raw = load_dataset(path=hf_dataset_dir_path, split="train", trust_remote_code=True)
-        print(f"Loaded {len(dataset_full_raw)} raw samples. Columns: {dataset_full_raw.column_names}")
+        # Instead of loading from local directory, load directly from HF
+        dataset_full_raw = load_dataset(DATASET_REPO_ID, split="train", trust_remote_code=True)
+        print(f"Loaded {len(dataset_full_raw)} raw samples from HF repo {DATASET_REPO_ID}")
+        print(f"Columns: {dataset_full_raw.column_names}")
         if 'hindi_sentence' in dataset_full_raw.column_names and 'text' not in dataset_full_raw.column_names:
             dataset_full_raw = dataset_full_raw.rename_column('hindi_sentence', 'text')
         elif 'sentence' in dataset_full_raw.column_names and 'text' not in dataset_full_raw.column_names: 
              dataset_full_raw = dataset_full_raw.rename_column('sentence', 'text')
         if "speaker_id" not in dataset_full_raw.column_names:
-            print(f"ERROR: 'speaker_id' column is MISSING from the raw dataset loaded from {hf_dataset_dir_path}.")
+            print(f"ERROR: 'speaker_id' column is MISSING from the raw dataset loaded from {DATASET_REPO_ID}.")
             print(f"Available columns: {dataset_full_raw.column_names}"); return None
         required_cols = ['audio', 'speaker_id', 'text'] 
         if not all(col in dataset_full_raw.column_names for col in required_cols):
-             print(f"ERROR: Dataset from {hf_dataset_dir_path} missing essential columns after rename (need {required_cols}). Found: {dataset_full_raw.column_names}"); return None
+             print(f"ERROR: Dataset from {DATASET_REPO_ID} missing essential columns after rename (need {required_cols}). Found: {dataset_full_raw.column_names}"); return None
         if len(dataset_full_raw) > 0 and dataset_full_raw[0]['audio']['sampling_rate'] != TARGET_AUDIO_SAMPLING_RATE:
             print(f"Resampling audio to {TARGET_AUDIO_SAMPLING_RATE} Hz...")
             dataset_full_raw = dataset_full_raw.cast_column("audio", Audio(sampling_rate=TARGET_AUDIO_SAMPLING_RATE))
     except Exception as e:
-        print(f"Error loading raw dataset from HF format directory {hf_dataset_dir_path}: {e}");
+        print(f"Error loading raw dataset from HF format directory {DATASET_REPO_ID}: {e}");
         import traceback; traceback.print_exc(); return None
     print(f"\n--- Filtering raw dataset for NEW speakers: {speakers_to_process_now} (using {CPU_MAP_NUM_WORKERS} workers) ---")
     target_speaker_set = set(speakers_to_process_now)
@@ -352,7 +355,7 @@ def process_specified_speakers_from_hf_format(hf_dataset_dir_path, speakers_to_p
         num_proc=CPU_MAP_NUM_WORKERS 
     )
     if len(dataset_for_new_speakers) == 0:
-        print(f"No data found for specified new speakers: {speakers_to_process_now} in dataset from {hf_dataset_dir_path}"); return None
+        print(f"No data found for specified new speakers: {speakers_to_process_now} in dataset from {DATASET_REPO_ID}"); return None
     print(f"Processing {len(dataset_for_new_speakers)} samples for new speakers.")
     
     print(f"\n--- Applying SNAC for new speakers ---")
@@ -449,14 +452,9 @@ def run_append_speaker_workflow(existing_processed_dataset_id, new_speaker_ids_t
         print(f"Error loading existing dataset {existing_processed_dataset_id}: {e}"); exit(1)
 
     print(f"\n--- Processing new speaker(s): {new_speaker_ids_to_add} ---")
-    # Determine which processing function to use based on LOCAL_RAW_DATASET_DIR content
-    if os.path.exists(os.path.join(LOCAL_RAW_DATASET_DIR, "organized_data.json")):
-        print(f"Detected 'organized_data.json' in '{LOCAL_RAW_DATASET_DIR}'. Using JSON + WAV loading method.")
-        processed_new_speaker_dataset = process_specified_speakers(LOCAL_RAW_DATASET_DIR, new_speaker_ids_to_add)
-    else:
-        print(f"Did not find 'organized_data.json'. Assuming HF Dataset format in '{LOCAL_RAW_DATASET_DIR}'.")
-        # Make sure LOCAL_RAW_DATASET_DIR is the root of the dataset (contains dataset_info.json, etc.)
-        processed_new_speaker_dataset = process_specified_speakers_from_hf_format(LOCAL_RAW_DATASET_DIR, new_speaker_ids_to_add)
+    # Load directly from HuggingFace
+    print(f"Loading data from HuggingFace repository: {DATASET_REPO_ID}")
+    processed_new_speaker_dataset = process_specified_speakers_from_hf_format(DATASET_REPO_ID, new_speaker_ids_to_add)
 
     if processed_new_speaker_dataset is None or len(processed_new_speaker_dataset) == 0:
         print("No data processed for new speakers. Aborting append workflow."); return
@@ -579,9 +577,9 @@ def run_preprocessing(speakers_to_process=None):
 
     load_models_and_tokenizer()
 
-    print(f"\n--- Loading Dataset from Local Directory: {LOCAL_RAW_DATASET_DIR} ---")
+    print(f"\n--- Loading Dataset from HuggingFace: {DATASET_REPO_ID} ---")
     try:
-        current_dataset = load_dataset(path=LOCAL_RAW_DATASET_DIR, split="train", trust_remote_code=True)
+        current_dataset = load_dataset(DATASET_REPO_ID, split="train", trust_remote_code=True)
         print(f"Loaded dataset with {len(current_dataset)} samples. Columns: {current_dataset.column_names}")
         if 'hindi_sentence' in current_dataset.column_names and 'text' not in current_dataset.column_names:
              current_dataset = current_dataset.rename_column('hindi_sentence', 'text')
@@ -742,9 +740,26 @@ def run_preprocessing(speakers_to_process=None):
 
 
 if __name__ == "__main__":
-    EXISTING_PROCESSED_DATASET_ID_ON_HUB = "bharathkumar1922001/hindi-tts-aisha-asmr-zadok-Filtered-aisha_asmr_zadok" 
-    NEW_SPEAKER_IDS_TO_PROCESS_AND_ADD = ["anika", "ivanna", "raju", "sia", "sangeeta"]
-    COMBINED_DATASET_NEW_HUB_ID = "bharathkumar1922001/aisha-asmr-zadok-anika-ivanna-raju-sia-sangeeta" 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Process the TTS dataset")
+    parser.add_argument("--dataset_id", type=str, default=DATASET_REPO_ID,
+                       help=f"HuggingFace dataset ID to process (default: {DATASET_REPO_ID})")
+    parser.add_argument("--existing_dataset_id", type=str, 
+                        default="bharathkumar1922001/aisha-asmr-zadok-anika-ivanna-raju-sia-sangeeta",
+                        help="HuggingFace dataset ID of existing processed dataset to append to")
+    parser.add_argument("--output_dataset_id", type=str,
+                        default="bharathkumar1922001/aisha-asmr-zadok-anika-ivanna-raju-sia-sangeeta-brittany-rhea-shyam-shayana-knoxdork-nikita",
+                        help="HuggingFace dataset ID for the output combined dataset")
+    args = parser.parse_args()
+    
+    # Update global variables with command line arguments if provided
+    if args.dataset_id != DATASET_REPO_ID:
+        DATASET_REPO_ID = args.dataset_id
+        print(f"Using dataset ID from command line: {DATASET_REPO_ID}")
+    
+    EXISTING_PROCESSED_DATASET_ID_ON_HUB = args.existing_dataset_id
+    NEW_SPEAKER_IDS_TO_PROCESS_AND_ADD = ["brittany", "rhea", "shyam", "shayana", "knoxdork", "nikita"]
+    COMBINED_DATASET_NEW_HUB_ID = args.output_dataset_id
     
     # Ensure global CPU worker settings are what's intended for the append workflow
     # The global CPU_MAP_NUM_WORKERS is defined at the top (cpu_count // 2).

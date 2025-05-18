@@ -458,11 +458,14 @@ class CustomTrainer(Trainer):
 
 
 class GenerateSamplesCallback(TrainerCallback):
-    def __init__(self, tokenizer, test_prompts, target_speaker_id, output_dir="eval_samples", wandb_run=None, log_to_wandb=True, generate_every_n_steps=None):
+    def __init__(self, tokenizer, test_prompts, speaker_ids, output_dir="eval_samples", wandb_run=None, log_to_wandb=True, generate_every_n_steps=None):
         super().__init__()
         self.tokenizer = tokenizer
         self.test_prompts = test_prompts # List of text prompts
-        self.target_speaker_id = target_speaker_id # e.g., "aisha"
+        # Support single speaker or list of speakers
+        self.speaker_ids = [speaker_ids] if isinstance(speaker_ids, str) else speaker_ids
+        print(f"GenerateSamplesCallback initialized with {len(self.speaker_ids)} speakers: {self.speaker_ids}")
+        
         self.output_dir_base = output_dir
         self.wandb_run = wandb_run
         self.log_to_wandb = log_to_wandb and (wandb_run is not None and wandb_run.mode != "disabled")
@@ -477,13 +480,13 @@ class GenerateSamplesCallback(TrainerCallback):
         if not os.path.exists(self.output_dir_base):
             os.makedirs(self.output_dir_base, exist_ok=True)
 
-    def _generate_audio(self, model, prompt_text, step_or_epoch):
+    def _generate_audio(self, model, prompt_text, speaker_id, step_or_epoch):
         model.eval() # Set model to evaluation mode
         device = model.device
 
         # Construct the input prompt for the model, including the speaker tag
         # This MUST match the format used in preprocess.py for training data
-        full_prompt_text = f"{self.target_speaker_id}: {prompt_text}"
+        full_prompt_text = f"{speaker_id}: {prompt_text}"
         
         input_ids_list = (
             [self.SOH] +
@@ -492,7 +495,7 @@ class GenerateSamplesCallback(TrainerCallback):
         )
         input_ids = torch.tensor([input_ids_list], device=device)
 
-        print(f"\nGenerating sample for: '{prompt_text}' (Speaker: {self.target_speaker_id}) at step/epoch {step_or_epoch}")
+        print(f"\nGenerating sample for: '{prompt_text}' (Speaker: {speaker_id}) at step/epoch {step_or_epoch}")
         
         with torch.no_grad():
             # Adjust generation parameters as needed for Orpheus
@@ -527,7 +530,7 @@ class GenerateSamplesCallback(TrainerCallback):
                 snac_codes.append(token_id)
         
         if not snac_codes:
-            print("Warning: No SNAC codes generated or extracted.")
+            print(f"Warning: No SNAC codes generated or extracted for speaker {speaker_id}.")
             return None, None
 
         # Decode SNAC codes to audio waveform
@@ -547,14 +550,14 @@ class GenerateSamplesCallback(TrainerCallback):
         # # sf.write(filepath, audio_data, TARGET_AUDIO_SAMPLING_RATE)
 
         # For now, just log that we generated codes
-        print(f"Generated {len(snac_codes)} SNAC codes.")
+        print(f"Generated {len(snac_codes)} SNAC codes for speaker {speaker_id}.")
         
         # Create a dummy audio file or log to WandB
         # This is a placeholder as true audio generation from SNAC codes requires the SNAC decoder part.
         # We can log the text and the fact that codes were generated.
         filename_safe_prompt = "".join(c if c.isalnum() else "_" for c in prompt_text[:30])
         # Create a dummy .txt file with snac codes for now
-        snac_codes_filepath = os.path.join(self.output_dir_base, f"step_{step_or_epoch}_spk_{self.target_speaker_id}_{filename_safe_prompt}_snac_codes.txt")
+        snac_codes_filepath = os.path.join(self.output_dir_base, f"step_{step_or_epoch}_spk_{speaker_id}_{filename_safe_prompt}_snac_codes.txt")
         with open(snac_codes_filepath, "w") as f:
             f.write(" ".join(map(str, snac_codes)))
         print(f"Saved SNAC codes to {snac_codes_filepath}")
@@ -563,7 +566,7 @@ class GenerateSamplesCallback(TrainerCallback):
             # Since we don't have easy audio decoding here, log the text and a placeholder.
             # If you integrate SNAC decoding, you'd use wandb.Audio
             self.wandb_run.log({
-                f"eval_sample_step_{step_or_epoch}/prompt_{filename_safe_prompt}_snac_codes_length": len(snac_codes),
+                f"eval_sample_step_{step_or_epoch}/spk_{speaker_id}_prompt_{filename_safe_prompt}_snac_codes_length": len(snac_codes),
                 # "eval_sample/audio": wandb.Audio(audio_data, caption=prompt_text, sample_rate=TARGET_AUDIO_SAMPLING_RATE) # If you had audio_data
             }, step=step_or_epoch) # Use trainer's global step
 
@@ -575,8 +578,10 @@ class GenerateSamplesCallback(TrainerCallback):
         # 'model' and 'tokenizer' are passed by the Trainer.
         if state.is_world_process_zero: # Ensure generation happens only on main process
             print(f"\n--- Callback: Generating samples after saving checkpoint at step {state.global_step} ---")
-            for prompt in self.test_prompts:
-                self._generate_audio(model, prompt, state.global_step)
+            for speaker_id in self.speaker_ids:
+                print(f"Generating samples for speaker {speaker_id}")
+                for prompt in self.test_prompts:
+                    self._generate_audio(model, prompt, speaker_id, state.global_step)
             model.train() # Set model back to training mode
 
     def on_step_end(self, args: TrainingArguments, state, control, model=None, tokenizer=None, **kwargs):
@@ -587,8 +592,10 @@ class GenerateSamplesCallback(TrainerCallback):
             print(f"\n--- Callback: Generating samples at step {state.global_step} (every {self.generate_every_n_steps} steps) ---")
             current_model_training_state = model.training # Save current model state
             model.eval()
-            for prompt in self.test_prompts:
-                self._generate_audio(model, prompt, state.global_step)
+            for speaker_id in self.speaker_ids:
+                print(f"Generating samples for speaker {speaker_id}")
+                for prompt in self.test_prompts:
+                    self._generate_audio(model, prompt, speaker_id, state.global_step)
             if current_model_training_state: # Restore if it was training
                 model.train()
 
@@ -597,18 +604,30 @@ class GenerateSamplesCallback(TrainerCallback):
 callbacks_to_use = []
 if config.get("generate_test_samples_on_save", False) or config.get("generate_test_samples_every_n_steps", 0) > 0:
     test_prompts_from_config = config.get("test_generation_prompts", [])
-    target_speaker_for_gen = None
-    if speakers_to_train_config and len(speakers_to_train_config) == 1:
-        target_speaker_for_gen = speakers_to_train_config[0]
-    elif config.get("target_speaker_for_generation"): # Allow override in config
-         target_speaker_for_gen = config.get("target_speaker_for_generation")
     
-    if test_prompts_from_config and target_speaker_for_gen:
-        print(f"Initializing GenerateSamplesCallback for speaker '{target_speaker_for_gen}'.")
+    # Determine which speakers to generate samples for
+    target_speakers_for_gen = []
+    generate_for_all = config.get("generate_for_all_speakers", False)
+    
+    # If generate_for_all_speakers is true, use all speakers being trained
+    if generate_for_all and speakers_to_train_config:
+        target_speakers_for_gen = speakers_to_train_config
+        print(f"Will generate samples for all speakers being trained: {target_speakers_for_gen}")
+    # Otherwise, check if a single target speaker is specified in config
+    elif config.get("target_speaker_for_generation"):
+        target_speakers_for_gen = [config.get("target_speaker_for_generation")]
+        print(f"Will generate samples for single speaker specified in config: {target_speakers_for_gen}")
+    # If one speaker is being trained, use that 
+    elif speakers_to_train_config and len(speakers_to_train_config) == 1:
+        target_speakers_for_gen = speakers_to_train_config
+        print(f"Will generate samples for the one speaker being trained: {target_speakers_for_gen}")
+    
+    if test_prompts_from_config and target_speakers_for_gen:
+        print(f"Initializing GenerateSamplesCallback for {len(target_speakers_for_gen)} speaker(s)")
         generate_callback = GenerateSamplesCallback(
             tokenizer=tokenizer, # The main tokenizer
             test_prompts=test_prompts_from_config,
-            target_speaker_id=target_speaker_for_gen,
+            speaker_ids=target_speakers_for_gen,
             output_dir=os.path.join(output_dir_local, "generated_eval_samples"), # Save samples inside checkpoint dir
             wandb_run=wandb.run if wandb.run and wandb.run.mode != "disabled" else None, # Pass wandb run object
             log_to_wandb=True, # Or control this via config
@@ -617,8 +636,8 @@ if config.get("generate_test_samples_on_save", False) or config.get("generate_te
         callbacks_to_use.append(generate_callback)
     elif not test_prompts_from_config:
         print("Warning: Test sample generation enabled in config, but 'test_generation_prompts' is empty.")
-    elif not target_speaker_for_gen:
-        print("Warning: Test sample generation enabled, but could not determine a single target speaker for generation (either 'speakers_to_train' is not a single speaker, or 'target_speaker_for_generation' is not set in config).")
+    elif not target_speakers_for_gen:
+        print("Warning: Test sample generation enabled, but no target speakers found. Please set 'generate_for_all_speakers: true' or 'target_speaker_for_generation' in config.")
 
 
 

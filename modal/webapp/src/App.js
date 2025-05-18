@@ -17,7 +17,7 @@ const SAMPLE_HINDI_SENTENCES = [
   "आर्टिफिशियल इंटेलिजेंस का भविष्य उज्जवल है",
   "यह एक नई तकनीक है जो भाषा को आवाज़ में बदलती है",
   "आपकी आवाज़ बहुत सुरीली है",
-  "मेरा नाम आइशा है और मैं आपकी सहायता करने के लिए यहां हूं",
+  "मैं आपकी सहायता करने के लिए यहां हूं",
   "आज हम एक नई यात्रा पर निकलेंगे",
   "हिंदी भारत की प्रमुख भाषाओं में से एक है"
 ];
@@ -26,7 +26,9 @@ function App() {
   // State variables
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [speakerId, setSpeakerId] = useState('aisha');
+  const [speakerId, setSpeakerId] = useState('');
+  const [availableSpeakers, setAvailableSpeakers] = useState([]);
+  const [defaultSpeaker, setDefaultSpeaker] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [healthStatus, setHealthStatus] = useState(null);
@@ -39,6 +41,7 @@ function App() {
   const [audioQualityPreset, setAudioQualityPreset] = useState('high');
   const [isHealthy, setIsHealthy] = useState(null);
   const [isWarmingUp, setIsWarmingUp] = useState(true);
+  const [apiInfo, setApiInfo] = useState(null);
   
   // Refs
   const waveformRef = useRef(null);
@@ -103,6 +106,34 @@ function App() {
     }
   }, [audioUrl]);
   
+  // Fetch API info (including available speakers)
+  const fetchApiInfo = async () => {
+    try {
+      const response = await fetch(`${config.apiUrl}/`);
+      const data = await response.json();
+      setApiInfo(data);
+      if (data.available_speakers && data.available_speakers.length > 0) {
+        setAvailableSpeakers(data.available_speakers);
+        setDefaultSpeaker(data.default_speaker || data.available_speakers[0]);
+        // Set the speakerId if it's not already set
+        if (!speakerId) {
+          setSpeakerId(data.default_speaker || data.available_speakers[0]);
+        }
+      }
+      return data;
+    } catch (error) {
+      console.error('Error fetching API info:', error);
+      // Fallback to default speakers if API info can't be fetched
+      const fallbackSpeakers = ['shayana', 'raju'];
+      setAvailableSpeakers(fallbackSpeakers);
+      setDefaultSpeaker('shayana');
+      if (!speakerId) {
+        setSpeakerId('shayana');
+      }
+      return null;
+    }
+  };
+  
   // Check API health status
   const checkHealth = async () => {
     try {
@@ -112,6 +143,9 @@ function App() {
       setHealthStatus(data);
       setIsHealthy(data.status === 'healthy');
       setIsWarmingUp(false);
+      
+      // Also fetch API info to get available speakers
+      await fetchApiInfo();
     } catch (error) {
       setHealthStatus({ error: error.message });
       setIsHealthy(false);
@@ -119,7 +153,7 @@ function App() {
     }
   };
   
-  // Initial health check on page load to warm up the server
+  // Initial health check and API info fetch on page load
   useEffect(() => {
     checkHealth();
   }, []);
@@ -178,6 +212,11 @@ function App() {
   
   const selectSampleSentence = (sentence) => {
     setText(sentence);
+  };
+  
+  // Capitalize first letter of speaker name for display
+  const formatSpeakerName = (name) => {
+    return name.charAt(0).toUpperCase() + name.slice(1);
   };
   
   return (
@@ -243,8 +282,17 @@ function App() {
                     id="speaker-select"
                     value={speakerId}
                     onChange={(e) => setSpeakerId(e.target.value)}
+                    disabled={availableSpeakers.length === 0}
                   >
-                    <option value="aisha">Aisha</option>
+                    {availableSpeakers.length > 0 ? (
+                      availableSpeakers.map(speaker => (
+                        <option key={speaker} value={speaker}>
+                          {formatSpeakerName(speaker)}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">Loading voices...</option>
+                    )}
                   </select>
                 </div>
                 
@@ -345,7 +393,7 @@ function App() {
                   <button
                     className="generate-button"
                     onClick={generateSpeech}
-                    disabled={isGenerating || !text.trim()}
+                    disabled={isGenerating || !text.trim() || !speakerId}
                   >
                     {isGenerating ? (
                       <>

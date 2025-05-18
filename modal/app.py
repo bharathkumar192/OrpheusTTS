@@ -11,13 +11,17 @@ import time
 import fastapi
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 
 # --- Configuration Constants ---
-MODEL_ID = "bharathkumar1922001/checkpoints_aisha_H200_good_run_v1"
+MODEL_ID = "bharathkumar1922001/orpheus-3b-hi-shayana-raju-6.4ksteps-39ksamples"
 ORPHEUS_CACHE_PATH = "/model_cache/orpheus" # Internal cache path within the container
 SNAC_CACHE_PATH = "/model_cache/snac"     # Internal cache path within the container
+
+# Define available speakers for the model
+AVAILABLE_SPEAKERS = ["shayana", "raju"]
+DEFAULT_SPEAKER = "shayana"  # Set default speaker to one that exists in the model
 
 SNAC_MODEL_NAME = "hubertsiuzdak/snac_24khz"
 TARGET_AUDIO_SAMPLING_RATE = 24000
@@ -35,7 +39,7 @@ PAD_TOKEN_ID_EXPECTED = 128263
 SNAC_OFFSETS = [AUDIO_CODE_BASE_OFFSET + i * 4096 for i in range(7)]
 
 # --- GPU Configuration ---
-_GPU_TYPE_ENV = "A100-80GB" # Your hardcoded choice
+_GPU_TYPE_ENV = "H100" # Your hardcoded choice
 
 if "H100" in _GPU_TYPE_ENV.upper():
     GPU_CONFIG = _GPU_TYPE_ENV
@@ -56,7 +60,7 @@ CONTAINER_TIMEOUT = int(os.environ.get("CONTAINER_TIMEOUT", "300")) # 5 minutes 
 # --- Request and Response Models (Pydantic) ---
 class TTSRequest(BaseModel):
     text: str = Field(..., description="The text to convert to speech")
-    speaker_id: str = Field(default="aisha", description="The speaker voice ID to use")
+    speaker_id: str = Field(default=DEFAULT_SPEAKER, description="The speaker voice ID to use")
     max_new_tokens: int = Field(default=2048, ge=100, le=4096, description="Maximum number of new (SNAC) tokens to generate")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Generation temperature. Use >0 for sampling.")
     repetition_penalty: float = Field(default=1.1, ge=1.0, le=2.0, description="Repetition penalty for generation.")
@@ -68,7 +72,13 @@ class TTSRequest(BaseModel):
     early_stopping: bool = Field(default=True, description="Enable early stopping in generation.")
     
     class Config:
-        json_schema_extra = {"example": {"text": "नमस्ते", "speaker_id": "aisha", "temperature": 0.7}}
+        json_schema_extra = {"example": {"text": "नमस्ते", "speaker_id": "shayana", "temperature": 0.7}}
+        
+    @validator('speaker_id')
+    def validate_speaker(cls, v):
+        if v.lower() not in AVAILABLE_SPEAKERS:
+            raise ValueError(f"Speaker '{v}' not available. Choose from: {', '.join(AVAILABLE_SPEAKERS)}")
+        return v.lower()  # Normalize to lowercase for consistency
 
 AUDIO_QUALITY_PRESETS = {
     "low": {"target_sr": 16000, "subtype": "PCM_16"},
@@ -175,6 +185,8 @@ class OrpheusTTSAPI:
                 "snac_model_id": SNAC_MODEL_NAME, 
                 "gpu_config": GPU_CONFIG,
                 "flash_attention_available": self.flash_attn_available, # Set in @modal.enter
+                "available_speakers": AVAILABLE_SPEAKERS,
+                "default_speaker": DEFAULT_SPEAKER,
                 "docs_url": "/docs" # FastAPI typically serves docs here
             }
 
@@ -431,7 +443,7 @@ class OrpheusTTSAPI:
 @app.local_entrypoint()
 def cli_test_generation(
     prompt: str = "नमस्ते, आपका दिन कैसा रहा?", 
-    speaker: str = "aisha", # Default speaker for testing
+    speaker: str = DEFAULT_SPEAKER, # Use DEFAULT_SPEAKER constant
     output_file: str = "cli_test_v2_output.wav" # Default output filename
 ):
     # This directory will be created on your *local* machine

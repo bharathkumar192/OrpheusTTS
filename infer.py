@@ -82,21 +82,15 @@ def deinterleave_snac_codes(snac_codes_flat, device):
 
     return codes_lvl0_tensor, codes_lvl1_tensor, codes_lvl2_tensor
 
-# --- Main Inference Function ---
-def run_inference(model_checkpoint_path, prompts, target_speaker_id, output_dir="inference_output", device="cuda"):
+# --- Main Inference Function (Modified) ---
+def run_inference(model_checkpoint_path, prompts, target_speaker_ids, output_dir="inference_output", device="cuda"): # Changed target_speaker_id to target_speaker_ids
     """
-    Runs inference using the fine-tuned Orpheus model and SNAC decoder.
-
-    Args:
-        model_checkpoint_path (str): Path to the fine-tuned Orpheus checkpoint directory.
-        prompts (list[str]): List of text sentences to generate audio for.
-        target_speaker_id (str): The speaker ID to use (must match training).
-        output_dir (str): Directory to save the generated .wav files.
-        device (str): "cuda" or "cpu".
+    Runs inference using the fine-tuned Orpheus model and SNAC decoder
+    for one or more target speakers.
     """
     print(f"--- Starting Inference ---")
     print(f"Model Checkpoint: {model_checkpoint_path}")
-    print(f"Speaker ID: {target_speaker_id}")
+    print(f"Speaker IDs: {target_speaker_ids}") # Changed
     print(f"Output Directory: {output_dir}")
     print(f"Using device: {device}")
 
@@ -104,180 +98,146 @@ def run_inference(model_checkpoint_path, prompts, target_speaker_id, output_dir=
         os.makedirs(output_dir, exist_ok=True)
         print(f"Created output directory: {output_dir}")
 
-    # --- Load Models and Tokenizer ---
+    # --- Load Models and Tokenizer (Load once) ---
     print("\n--- Loading Models and Tokenizer ---")
     try:
-        print(f"Loading Orpheus tokenizer from: {model_checkpoint_path}")
         tokenizer = AutoTokenizer.from_pretrained(model_checkpoint_path)
-        # Ensure pad token is set correctly (important for generation)
         if tokenizer.pad_token_id is None:
-             print(f"Tokenizer pad_token_id is None. Setting to default: {PAD_TOKEN_ID}")
-             tokenizer.add_special_tokens({'pad_token': str(PAD_TOKEN_ID)}) # Should already be in vocab if trained correctly
+             tokenizer.add_special_tokens({'pad_token': str(PAD_TOKEN_ID)})
              tokenizer.pad_token_id = PAD_TOKEN_ID
 
-        print(f"Loading Orpheus model from: {model_checkpoint_path}")
-        # Load with appropriate dtype for inference (matching training if possible)
         model_load_kwargs = {"torch_dtype": torch.bfloat16 if device == "cuda" and torch.cuda.is_bf16_supported() else torch.float16 if device == "cuda" else torch.float32}
-        # Attempt to use Flash Attention 2 if available and on CUDA
         pt_version = torch.__version__
         if tuple(map(int, pt_version.split('.')[:2])) >= (2, 0) and device=="cuda" and torch.cuda.get_device_capability()[0] >= 8:
             model_load_kwargs["attn_implementation"] = "flash_attention_2"
-            print("Attempting to use Flash Attention 2 for model loading.")
         
         orpheus_model = AutoModelForCausalLM.from_pretrained(model_checkpoint_path, **model_load_kwargs)
         orpheus_model.to(device)
         orpheus_model.eval()
-        print("Orpheus model loaded and set to eval mode.")
 
-        print(f"Loading SNAC model ({SNAC_MODEL_NAME}) for decoding...")
         snac_model = SNAC.from_pretrained(SNAC_MODEL_NAME)
         snac_model.to(device)
         snac_model.eval()
-        print("SNAC model loaded and set to eval mode.")
-
+        print("Models and tokenizer loaded successfully.")
     except Exception as e:
         print(f"ERROR loading models/tokenizer: {e}")
         import traceback
         traceback.print_exc()
         return
 
-    # --- Generate Audio for Each Prompt ---
-    for i, prompt_text in enumerate(prompts):
-        print(f"\n--- Processing Prompt {i+1}/{len(prompts)} ---")
-        print(f"Text: '{prompt_text}'")
+    # --- Loop Through Each Speaker ---
+    for speaker_idx, current_speaker_id in enumerate(target_speaker_ids):
+        print(f"\n--- Processing for Speaker {speaker_idx + 1}/{len(target_speaker_ids)}: {current_speaker_id} ---")
+        
+        # --- Generate Audio for Each Prompt for the current speaker ---
+        for i, prompt_text in enumerate(prompts):
+            print(f"  --- Prompt {i+1}/{len(prompts)} for {current_speaker_id} ---")
+            print(f"  Text: '{prompt_text}'")
 
-        start_time = time.time()
+            speaker_prompt_start_time = time.time()
 
-        # 1. Format Input
-        full_prompt_text = f"{target_speaker_id}: {prompt_text}"
-        try:
-            input_ids_list = (
-                [start_of_human_token] +
-                tokenizer.encode(full_prompt_text, add_special_tokens=False) +
-                [end_of_human_token, start_of_ai_token, start_of_speech_token] # Model generates from <SOS>
-            )
-            input_ids = torch.tensor([input_ids_list], device=device)
-            print(f"Input tokens length: {input_ids.shape[1]}")
-        except Exception as e:
-            print(f"Error tokenizing prompt: {e}")
-            continue
-
-        # 2. Generate SNAC Codes with Orpheus
-        print("Generating SNAC codes with Orpheus model...")
-        try:
-            with torch.inference_mode():
-                generated_ids = orpheus_model.generate(
-                    input_ids,
-                    max_new_tokens=2048, # Max SNAC tokens (7 per frame, ~32ms/frame). 2048 = ~292 frames = ~9.3 sec. Adjust if needed.
-                    num_beams=1,         # Greedy decoding
-                    do_sample=False,
-                    pad_token_id=tokenizer.pad_token_id,
-                    eos_token_id=[end_of_speech_token, end_of_ai_token], # Stop at either EOSpeech or EOA
-                    # temperature=0.7, # Keep deterministic for audio codes usually
-                    # top_k=50,        # Keep deterministic for audio codes usually
+            # 1. Format Input
+            full_prompt_text = f"{current_speaker_id}: {prompt_text}" # Use current_speaker_id
+            try:
+                input_ids_list = (
+                    [start_of_human_token] +
+                    tokenizer.encode(full_prompt_text, add_special_tokens=False) +
+                    [end_of_human_token, start_of_ai_token, start_of_speech_token]
                 )
-            gen_duration = time.time() - start_time
-            print(f"Orpheus generation took {gen_duration:.2f} seconds.")
-
-            # Extract generated part
-            generated_sequence = generated_ids[0][input_ids.shape[1]:].tolist()
-            print(f"Generated {len(generated_sequence)} new tokens.")
-
-            # 3. Extract SNAC codes from generated sequence
-            snac_codes_generated = []
-            for token_id in generated_sequence:
-                if token_id == end_of_speech_token or token_id == end_of_ai_token:
-                    break # Stop collecting codes
-                # Basic check: is it likely an audio code?
-                if token_id >= AUDIO_CODE_BASE_OFFSET and token_id < (AUDIO_CODE_BASE_OFFSET + 4096 * 7):
-                    snac_codes_generated.append(token_id)
-
-            print(f"Extracted {len(snac_codes_generated)} SNAC code tokens.")
-
-            if not snac_codes_generated:
-                print("Warning: No SNAC codes were generated or extracted. Skipping audio decoding.")
+                input_ids = torch.tensor([input_ids_list], device=device)
+            except Exception as e:
+                print(f"  Error tokenizing prompt for {current_speaker_id}: {e}")
                 continue
-            if len(snac_codes_generated) % 7 != 0:
-                print(f"Warning: Number of extracted SNAC codes ({len(snac_codes_generated)}) is not a multiple of 7. Truncating...")
-                snac_codes_generated = snac_codes_generated[:-(len(snac_codes_generated) % 7)]
+
+            # 2. Generate SNAC Codes with Orpheus
+            print(f"  Generating SNAC codes for {current_speaker_id}...")
+            try:
+                with torch.inference_mode():
+                    generated_ids = orpheus_model.generate(
+                        input_ids,
+                        max_new_tokens=2048,
+                        num_beams=1,
+                        do_sample=False,
+                        pad_token_id=tokenizer.pad_token_id,
+                        eos_token_id=[end_of_speech_token, end_of_ai_token],
+                    )
+                
+                generated_sequence = generated_ids[0][input_ids.shape[1]:].tolist()
+                snac_codes_generated = []
+                for token_id in generated_sequence:
+                    if token_id == end_of_speech_token or token_id == end_of_ai_token:
+                        break
+                    if token_id >= AUDIO_CODE_BASE_OFFSET and token_id < (AUDIO_CODE_BASE_OFFSET + 4096 * 7):
+                        snac_codes_generated.append(token_id)
+
                 if not snac_codes_generated:
-                    print("Warning: No valid SNAC codes left after truncation. Skipping.")
+                    print(f"  Warning: No SNAC codes generated for {current_speaker_id}. Skipping.")
                     continue
-                print(f"Using {len(snac_codes_generated)} SNAC codes after truncation.")
+                if len(snac_codes_generated) % 7 != 0:
+                    snac_codes_generated = snac_codes_generated[:-(len(snac_codes_generated) % 7)]
+                    if not snac_codes_generated:
+                        print(f"  Warning: No valid SNAC codes left after truncation for {current_speaker_id}. Skipping.")
+                        continue
+            except Exception as e:
+                print(f"  Error during Orpheus generation for {current_speaker_id}: {e}")
+                import traceback; traceback.print_exc()
+                continue
 
-
-        except Exception as e:
-            print(f"Error during Orpheus generation: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
-
-        # 4. De-interleave SNAC codes
-        print("De-interleaving SNAC codes...")
-        try:
+            # 4. De-interleave SNAC codes
+            print(f"  De-interleaving SNAC codes for {current_speaker_id}...")
             codes_l0, codes_l1, codes_l2 = deinterleave_snac_codes(snac_codes_generated, device)
             if codes_l0 is None:
-                print("Failed to de-interleave codes. Skipping decoding.")
+                print(f"  Failed to de-interleave codes for {current_speaker_id}. Skipping.")
                 continue
-            print(f"De-interleaved shapes: L0={codes_l0.shape}, L1={codes_l1.shape}, L2={codes_l2.shape}")
-        except Exception as e:
-            print(f"Error during de-interleaving: {e}")
-            continue
 
-        # 5. Decode SNAC codes to Audio using SNAC Model
-        print("Decoding SNAC codes to waveform using SNAC model...")
-        decode_start_time = time.time()
-        try:
-            with torch.inference_mode():
-                # The SNAC model expects a list of the 3 code tensors
-                waveform_tensor = snac_model.decode([codes_l0, codes_l1, codes_l2])
-            decode_duration = time.time() - decode_start_time
-            print(f"SNAC decoding took {decode_duration:.2f} seconds.")
+            # 5. Decode SNAC codes to Audio
+            print(f"  Decoding SNAC codes to waveform for {current_speaker_id}...")
+            try:
+                with torch.inference_mode():
+                    waveform_tensor = snac_model.decode([codes_l0, codes_l1, codes_l2])
+                if waveform_tensor is None or waveform_tensor.numel() == 0:
+                     print(f"  Warning: SNAC decoding produced an empty waveform for {current_speaker_id}.")
+                     continue
 
-            if waveform_tensor is None or waveform_tensor.numel() == 0:
-                 print("Warning: SNAC decoding produced an empty waveform.")
-                 continue
+                # 6. Save Audio
+                audio_data = waveform_tensor.squeeze().cpu().numpy()
+                filename_safe_prompt = "".join(c if c.isalnum() else "_" for c in prompt_text[:40])
+                output_filename = f"output_{current_speaker_id}_{i+1}_{filename_safe_prompt}.wav" # Use current_speaker_id
+                output_filepath = os.path.join(output_dir, output_filename)
 
-            # 6. Save Audio
-            audio_data = waveform_tensor.squeeze().cpu().numpy() # Shape [T_audio]
-            filename_safe_prompt = "".join(c if c.isalnum() else "_" for c in prompt_text[:40])
-            output_filename = f"output_{target_speaker_id}_{i+1}_{filename_safe_prompt}.wav"
-            output_filepath = os.path.join(output_dir, output_filename)
+                sf.write(output_filepath, audio_data, TARGET_AUDIO_SAMPLING_RATE)
+                total_prompt_time = time.time() - speaker_prompt_start_time
+                print(f"  Successfully saved audio to: {output_filepath}")
+                print(f"  Total time for this prompt/speaker: {total_prompt_time:.2f} seconds")
 
-            sf.write(output_filepath, audio_data, TARGET_AUDIO_SAMPLING_RATE)
-            total_time = time.time() - start_time
-            print(f"Successfully saved audio to: {output_filepath}")
-            print(f"Total time for prompt: {total_time:.2f} seconds")
-
-        except Exception as e:
-            print(f"Error during SNAC decoding or saving audio: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
+            except Exception as e:
+                print(f"  Error during SNAC decoding or saving audio for {current_speaker_id}: {e}")
+                import traceback; traceback.print_exc()
+                continue
 
     print("\n--- Inference Script Finished ---")
 
 
-# --- Argument Parser ---
+# --- Argument Parser (Modified) ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run inference with a fine-tuned Orpheus TTS model.")
     parser.add_argument(
         "--model_checkpoint",
         type=str,
         required=True,
-        help="Path to the fine-tuned Orpheus model checkpoint directory (e.g., './checkpoints_aisha_H200_good_run_v1/')."
+        help="Path to the fine-tuned Orpheus model checkpoint directory."
     )
     parser.add_argument(
         "--prompts",
-        nargs='+', # Allows multiple prompts separated by spaces
+        nargs='+',
         required=True,
-        help="List of text prompts to generate audio for (e.g., 'नमस्ते' 'आप कैसे हैं?')."
+        help="List of text prompts to generate audio for."
     )
     parser.add_argument(
-        "--speaker_id",
-        type=str,
+        "--speaker_ids", # Changed from speaker_id to speaker_ids
+        nargs='+',        # Allow multiple speaker IDs
         required=True,
-        help="The target speaker ID used during training (e.g., 'aisha')."
+        help="List of target speaker IDs used during training (e.g., 'shayana' 'raju')."
     )
     parser.add_argument(
         "--output_dir",
@@ -295,19 +255,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Basic validation
     if not os.path.isdir(args.model_checkpoint):
         print(f"Error: Model checkpoint directory not found: {args.model_checkpoint}")
         exit(1)
     if not args.prompts:
         print(f"Error: No prompts provided.")
         exit(1)
-
+    if not args.speaker_ids: # Check speaker_ids
+        print(f"Error: No speaker IDs provided.")
+        exit(1)
 
     run_inference(
         model_checkpoint_path=args.model_checkpoint,
         prompts=args.prompts,
-        target_speaker_id=args.speaker_id,
+        target_speaker_ids=args.speaker_ids, # Pass the list of speaker IDs
         output_dir=args.output_dir,
         device=args.device
     )

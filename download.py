@@ -88,7 +88,7 @@ def main():
     parser.add_argument(
         "--repo_id",
         type=str,
-        default="bharathkumar1922001/hindi-tts-multi-speaker", # Default to your specified repo
+        default="maya-research/Multi-speaker-TTS", # Default to your specified repo
         help="Hugging Face Hub repository ID (e.g., 'username/dataset_name')."
     )
     parser.add_argument(
