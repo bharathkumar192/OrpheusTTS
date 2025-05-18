@@ -65,10 +65,29 @@ function App() {
   // Initialize WaveSurfer when audio URL changes
   useEffect(() => {
     if (audioUrl && waveformRef.current) {
+      // First, clean up any previous instance and event listeners
       if (wavesurferRef.current) {
         wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
       }
       
+      if (audioRef.current) {
+        // Remove all existing event listeners to prevent duplicates
+        const oldAudio = audioRef.current;
+        oldAudio.pause();
+        oldAudio.removeAttribute('src');
+        oldAudio.load();
+        
+        // Clean up any existing event listeners
+        const newAudio = oldAudio.cloneNode(false);
+        oldAudio.parentNode.replaceChild(newAudio, oldAudio);
+        audioRef.current = newAudio;
+        
+        // Set the new source
+        audioRef.current.src = audioUrl;
+      }
+      
+      // Create new WaveSurfer instance
       const wavesurfer = WaveSurfer.create({
         container: waveformRef.current,
         waveColor: '#4eff91',
@@ -81,28 +100,65 @@ function App() {
         barGap: 3,
         responsive: true,
         normalize: true,
-        media: audioRef.current // Connect to audio element for better sync
       });
       
       wavesurfer.load(audioUrl);
       wavesurferRef.current = wavesurfer;
       
+      // Wait for WaveSurfer to be ready before setting up event handlers
       wavesurfer.on('ready', () => {
-        // Wait a moment for the audio to be fully ready
-        setTimeout(() => {
-          if (audioRef.current) {
-            // Sync wavesurfer to audio element
-            audioRef.current.addEventListener('play', () => wavesurfer.play());
-            audioRef.current.addEventListener('pause', () => wavesurfer.pause());
-            audioRef.current.addEventListener('seeked', () => {
-              wavesurfer.seekTo(audioRef.current.currentTime / audioRef.current.duration);
-            });
-            
-            // Start playback
-            audioRef.current.play();
-          }
-        }, 100);
+        if (audioRef.current) {
+          // Sync audio element to wavesurfer
+          audioRef.current.addEventListener('play', () => {
+            if (!wavesurfer.isPlaying()) wavesurfer.play();
+          });
+          
+          audioRef.current.addEventListener('pause', () => {
+            if (wavesurfer.isPlaying()) wavesurfer.pause();
+          });
+          
+          audioRef.current.addEventListener('seeked', () => {
+            const currentTime = audioRef.current.currentTime;
+            const duration = audioRef.current.duration;
+            if (duration > 0) {
+              wavesurfer.seekTo(currentTime / duration);
+            }
+          });
+          
+          // Sync wavesurfer to audio element
+          wavesurfer.on('play', () => {
+            if (audioRef.current.paused) audioRef.current.play();
+          });
+          
+          wavesurfer.on('pause', () => {
+            if (!audioRef.current.paused) audioRef.current.pause();
+          });
+          
+          wavesurfer.on('seek', (progress) => {
+            if (audioRef.current.duration) {
+              audioRef.current.currentTime = progress * audioRef.current.duration;
+            }
+          });
+          
+          // Start playback with a slight delay to ensure everything is loaded
+          setTimeout(() => {
+            try {
+              audioRef.current.play()
+                .catch(err => console.log("Autoplay prevented:", err));
+            } catch (e) {
+              console.log("Error during autoplay:", e);
+            }
+          }, 300);
+        }
       });
+      
+      // Cleanup for this effect
+      return () => {
+        if (wavesurferRef.current) {
+          wavesurferRef.current.destroy();
+          wavesurferRef.current = null;
+        }
+      };
     }
   }, [audioUrl]);
   
@@ -222,6 +278,22 @@ function App() {
     
     setIsGenerating(true);
     
+    // If we have an existing audio, pause it and clear its source
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+    }
+    
+    // If we have an existing wavesurfer, destroy it
+    if (wavesurferRef.current) {
+      wavesurferRef.current.destroy();
+      wavesurferRef.current = null;
+    }
+    
+    // Reset the audio URL to null to ensure the useEffect will trigger properly
+    setAudioUrl(null);
+    
     const requestBody = {
       text,
       speaker_id: speakerId,
@@ -247,12 +319,16 @@ function App() {
       }
       
       const audioBlob = await response.blob();
+      
+      // Revoke any existing URL object to prevent memory leaks
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      
       const url = URL.createObjectURL(audioBlob);
       
+      // Set the new audio URL, which will trigger the useEffect hook
       setAudioUrl(url);
-      if (audioRef.current) {
-        audioRef.current.src = url;
-      }
     } catch (error) {
       console.error('Error generating speech:', error);
       alert('Error generating speech. Please try again.');
@@ -489,4 +565,67 @@ function App() {
             
             {/* Right Column - Output */}
             <div className="output-column">
-              <div className={`
+              <div className={`audio-output-section ${audioUrl ? 'active' : ''}`}>
+                <h2>Generated Audio</h2>
+                
+                {audioUrl ? (
+                  <>
+                    <div className="waveform-container" ref={waveformRef}></div>
+                    <div className="audio-controls">
+                      <audio ref={audioRef} controls>
+                        <source src={audioUrl} type="audio/wav" />
+                        Your browser does not support the audio element.
+                      </audio>
+                      <a
+                        href={audioUrl}
+                        download="maya_tts_output.wav"
+                        className="download-button"
+                      >
+                        Download Audio
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="placeholder-container">
+                    {isGenerating ? (
+                      <div className="processing-indicator">
+                        <div className="large-spinner"></div>
+                        <div className="processing-text">Processing audio...</div>
+                      </div>
+                    ) : (
+                      <div className="placeholder-message">
+                        Generated audio visualization will appear here
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Sample Sentences at Bottom */}
+          <div className="sample-sentences-section">
+            <h2>Sample Hindi Sentences</h2>
+            <div className="sentence-carousel">
+              {SAMPLE_HINDI_SENTENCES.map((sentence, index) => (
+                <div
+                  key={index}
+                  className="sample-pill"
+                  onClick={() => selectSampleSentence(sentence)}
+                >
+                  {sentence}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <footer className="minimal-footer">
+            <p>Built by <a href="https://www.dheemanthreddy.com/" target="_blank" rel="noopener noreferrer">Dheemanth Reddy</a> | <a href="https://www.linkedin.com/in/bharath-kumar92" target="_blank" rel="noopener noreferrer">Bharath Kumar</a></p>
+          </footer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
