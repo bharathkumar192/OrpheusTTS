@@ -307,6 +307,13 @@ body, html {
   color: var(--text-white);
 }
 
+.select-with-refresh {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+
 .speaker-selection select {
   background-color: rgba(8, 10, 12, 0.8);
   color: var(--text-white);
@@ -323,6 +330,32 @@ body, html {
   outline: none;
   border-color: var(--green-glow);
   box-shadow: 0 0 10px rgba(29, 185, 84, 0.3);
+}
+
+.refresh-button {
+  background-color: rgba(8, 10, 12, 0.8);
+  color: var(--green-bright);
+  border: 1px solid rgba(29, 185, 84, 0.2);
+  border-radius: var(--border-radius);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-standard);
+  font-size: 1.2rem;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: rgba(29, 185, 84, 0.15);
+  border-color: var(--green-glow);
+  transform: rotate(180deg);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Advanced Options Toggle */
@@ -813,4 +846,45 @@ audio {
   .sample-pill {
     max-width: 100%;
   }
+}
+
+/* Debug Info */
+.debug-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 200, 50, 0.1);
+  border: 1px solid rgba(255, 200, 50, 0.3);
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+  color: #ffcc33;
+}
+
+.debug-info p {
+  margin-bottom: 0.5rem;
+}
+
+.debug-info ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.debug-info li {
+  margin-bottom: 0.3rem;
+}
+
+.manual-fallback-btn {
+  background-color: rgba(255, 200, 50, 0.2);
+  color: #ffcc33;
+  border: 1px solid rgba(255, 200, 50, 0.5);
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-standard);
+  width: 100%;
+}
+
+.manual-fallback-btn:hover {
+  background-color: rgba(255, 200, 50, 0.3);
+  border-color: #ffcc33;
 } 

@@ -109,47 +109,98 @@ function App() {
   // Fetch API info (including available speakers)
   const fetchApiInfo = async () => {
     try {
-      const response = await fetch(`${config.apiUrl}/`);
+      console.log("Fetching API info from:", config.apiUrl);
+      const response = await fetch(`${config.apiUrl}/`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log("API info received:", data);
       setApiInfo(data);
-      if (data.available_speakers && data.available_speakers.length > 0) {
+      
+      // Check if the API returned the expected speaker data
+      if (data.available_speakers && Array.isArray(data.available_speakers) && data.available_speakers.length > 0) {
+        console.log("Available speakers from API:", data.available_speakers);
         setAvailableSpeakers(data.available_speakers);
         setDefaultSpeaker(data.default_speaker || data.available_speakers[0]);
+        
         // Set the speakerId if it's not already set
-        if (!speakerId) {
-          setSpeakerId(data.default_speaker || data.available_speakers[0]);
-        }
+        setSpeakerId(prevSpeakerId => {
+          if (!prevSpeakerId) {
+            console.log("Setting speaker ID to:", data.default_speaker || data.available_speakers[0]);
+            return data.default_speaker || data.available_speakers[0];
+          }
+          return prevSpeakerId;
+        });
+      } else {
+        console.warn("API response missing expected speaker data, using fallback speakers");
+        // Use fallback values
+        useDefaultSpeakers();
       }
       return data;
     } catch (error) {
       console.error('Error fetching API info:', error);
       // Fallback to default speakers if API info can't be fetched
-      const fallbackSpeakers = ['shayana', 'raju'];
-      setAvailableSpeakers(fallbackSpeakers);
-      setDefaultSpeaker('shayana');
-      if (!speakerId) {
-        setSpeakerId('shayana');
-      }
+      useDefaultSpeakers();
       return null;
     }
   };
   
+  // Helper function to set default speakers when API fails
+  const useDefaultSpeakers = () => {
+    const fallbackSpeakers = ['shayana', 'raju'];
+    console.log("Using fallback speakers:", fallbackSpeakers);
+    setAvailableSpeakers(fallbackSpeakers);
+    setDefaultSpeaker('shayana');
+    setSpeakerId(prevSpeakerId => {
+      if (!prevSpeakerId) {
+        return 'shayana';
+      }
+      return prevSpeakerId;
+    });
+  };
+  
   // Check API health status
   const checkHealth = async () => {
+    setIsWarmingUp(true);
+    
     try {
-      setIsWarmingUp(true);
-      const response = await fetch(`${config.apiUrl}/health`);
+      console.log("Checking API health at:", `${config.apiUrl}/health`);
+      const response = await fetch(`${config.apiUrl}/health`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Health check failed with status ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log("Health check response:", data);
       setHealthStatus(data);
       setIsHealthy(data.status === 'healthy');
+    } catch (error) {
+      console.error('Health check failed:', error);
+      setHealthStatus({ error: error.message, status: 'unhealthy' });
+      setIsHealthy(false);
+    } finally {
       setIsWarmingUp(false);
       
-      // Also fetch API info to get available speakers
-      await fetchApiInfo();
-    } catch (error) {
-      setHealthStatus({ error: error.message });
-      setIsHealthy(false);
-      setIsWarmingUp(false);
+      // Always try to fetch API info, even if health check fails
+      try {
+        await fetchApiInfo();
+      } catch (error) {
+        console.error("Failed to fetch API info after health check:", error);
+      }
     }
   };
   
@@ -278,22 +329,32 @@ function App() {
                 
                 <div className="speaker-selection">
                   <label htmlFor="speaker-select">Voice:</label>
-                  <select 
-                    id="speaker-select"
-                    value={speakerId}
-                    onChange={(e) => setSpeakerId(e.target.value)}
-                    disabled={availableSpeakers.length === 0}
-                  >
-                    {availableSpeakers.length > 0 ? (
-                      availableSpeakers.map(speaker => (
-                        <option key={speaker} value={speaker}>
-                          {formatSpeakerName(speaker)}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">Loading voices...</option>
-                    )}
-                  </select>
+                  <div className="select-with-refresh">
+                    <select 
+                      id="speaker-select"
+                      value={speakerId}
+                      onChange={(e) => setSpeakerId(e.target.value)}
+                      disabled={availableSpeakers.length === 0 || isWarmingUp}
+                    >
+                      {availableSpeakers.length > 0 ? (
+                        availableSpeakers.map(speaker => (
+                          <option key={speaker} value={speaker}>
+                            {formatSpeakerName(speaker)}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">Loading voices...</option>
+                      )}
+                    </select>
+                    <button 
+                      className="refresh-button" 
+                      onClick={fetchApiInfo} 
+                      title="Refresh speakers list"
+                      disabled={isWarmingUp}
+                    >
+                      ⟳
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="advanced-toggle">
@@ -404,73 +465,28 @@ function App() {
                       "Generate Speech"
                     )}
                   </button>
+                  
+                  {/* Debug info for API connection issues */}
+                  {availableSpeakers.length === 0 && !isWarmingUp && (
+                    <div className="debug-info">
+                      <p>Having trouble connecting to the API? Try these steps:</p>
+                      <ol>
+                        <li>Click the refresh button next to the voice dropdown</li>
+                        <li>Check if your browser is blocking cross-origin requests</li>
+                        <li>Ensure the API is running (check Server Status)</li>
+                      </ol>
+                      <button 
+                        className="manual-fallback-btn"
+                        onClick={useDefaultSpeakers}
+                      >
+                        Use Fallback Speakers
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
             
             {/* Right Column - Output */}
             <div className="output-column">
-              <div className={`audio-output-section ${audioUrl ? 'active' : ''}`}>
-                <h2>Generated Audio</h2>
-                
-                {audioUrl ? (
-                  <>
-                    <div className="waveform-container" ref={waveformRef}></div>
-                    <div className="audio-controls">
-                      <audio ref={audioRef} controls>
-                        <source src={audioUrl} type="audio/wav" />
-                        Your browser does not support the audio element.
-                      </audio>
-                      <a
-                        href={audioUrl}
-                        download="maya_tts_output.wav"
-                        className="download-button"
-                      >
-                        Download Audio
-                      </a>
-                    </div>
-                  </>
-                ) : (
-                  <div className="placeholder-container">
-                    {isGenerating ? (
-                      <div className="processing-indicator">
-                        <div className="large-spinner"></div>
-                        <div className="processing-text">Processing audio...</div>
-                      </div>
-                    ) : (
-                      <div className="placeholder-message">
-                        Generated audio visualization will appear here
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Sample Sentences at Bottom */}
-          <div className="sample-sentences-section">
-            <h2>Sample Hindi Sentences</h2>
-            <div className="sentence-carousel">
-              {SAMPLE_HINDI_SENTENCES.map((sentence, index) => (
-                <div
-                  key={index}
-                  className="sample-pill"
-                  onClick={() => selectSampleSentence(sentence)}
-                >
-                  {sentence}
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <footer className="minimal-footer">
-            <p>Built by <a href="https://www.dheemanthreddy.com/" target="_blank" rel="noopener noreferrer">Dheemanth Reddy</a> | <a href="https://www.linkedin.com/in/bharath-kumar92" target="_blank" rel="noopener noreferrer">Bharath Kumar</a></p>
-          </footer>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default App; 
+              <div className={`
