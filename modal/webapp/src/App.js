@@ -198,19 +198,19 @@ function App() {
       } else {
         console.warn("API response missing expected speaker data, using fallback speakers");
         // Use fallback values
-        useDefaultSpeakers();
+        setFallbackSpeakers();
       }
       return data;
     } catch (error) {
       console.error('Error fetching API info:', error);
       // Fallback to default speakers if API info can't be fetched
-      useDefaultSpeakers();
+      setFallbackSpeakers();
       return null;
     }
   };
   
   // Helper function to set default speakers when API fails
-  const useDefaultSpeakers = () => {
+  const setFallbackSpeakers = () => {
     const fallbackSpeakers = ['shayana', 'raju'];
     console.log("Using fallback speakers:", fallbackSpeakers);
     setAvailableSpeakers(fallbackSpeakers);
@@ -553,7 +553,7 @@ function App() {
                       </ol>
                       <button 
                         className="manual-fallback-btn"
-                        onClick={useDefaultSpeakers}
+                        onClick={setFallbackSpeakers}
                       >
                         Use Fallback Speakers
                       </button>
