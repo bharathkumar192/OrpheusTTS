@@ -42,6 +42,7 @@ function App() {
   const [isHealthy, setIsHealthy] = useState(null);
   const [isWarmingUp, setIsWarmingUp] = useState(true);
   const [apiInfo, setApiInfo] = useState(null);
+  const [speakerDetails, setSpeakerDetails] = useState(null);
   
   // Refs
   const waveformRef = useRef(null);
@@ -211,7 +212,7 @@ function App() {
   
   // Helper function to set default speakers when API fails
   const setFallbackSpeakers = () => {
-    const fallbackSpeakers = ['shayana', 'raju'];
+    const fallbackSpeakers = ['aisha', 'anika', 'arfa', 'asmr', 'nikita', 'raju', 'rhea', 'ruhaan', 'sangeeta', 'shayana'];
     console.log("Using fallback speakers:", fallbackSpeakers);
     setAvailableSpeakers(fallbackSpeakers);
     setDefaultSpeaker('shayana');
@@ -254,6 +255,7 @@ function App() {
       // Always try to fetch API info, even if health check fails
       try {
         await fetchApiInfo();
+        await fetchSpeakerDetails(); // Also fetch speaker details
       } catch (error) {
         console.error("Failed to fetch API info after health check:", error);
       }
@@ -341,9 +343,66 @@ function App() {
     setText(sentence);
   };
   
-  // Capitalize first letter of speaker name for display
+  // Fetch detailed speaker information from API
+  const fetchSpeakerDetails = async () => {
+    try {
+      console.log("Fetching speaker details from:", `${config.apiUrl}/speakers`);
+      const response = await fetch(`${config.apiUrl}/speakers`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Speaker details received:", data);
+        setSpeakerDetails(data);
+        return data;
+      } else {
+        console.warn("Speaker details endpoint not available, using local metadata");
+        return null;
+      }
+    } catch (error) {
+      console.warn('Error fetching speaker details:', error);
+      return null;
+    }
+  };
+
+  // Enhanced speaker metadata that can use API data or fallback to local data
+  const getSpeakerMetadata = (speakerId) => {
+    // Try to use API data first if available
+    if (speakerDetails && speakerDetails.speaker_descriptions && speakerDetails.speaker_descriptions[speakerId]) {
+      const apiDescription = speakerDetails.speaker_descriptions[speakerId];
+      const genderGuess = apiDescription.toLowerCase().includes('male') && !apiDescription.toLowerCase().includes('female') ? 'male' : 
+                         apiDescription.toLowerCase().includes('asmr') ? 'special' : 'female';
+      return {
+        name: speakerId.charAt(0).toUpperCase() + speakerId.slice(1),
+        description: apiDescription,
+        gender: genderGuess
+      };
+    }
+    
+    // Fallback to local metadata
+    const speakerData = {
+      'aisha': { name: 'Aisha', description: 'Girlfriend female speaker - warm and intimate voice', gender: 'female' },
+      'anika': { name: 'Anika', description: 'Social female speaker - energetic and friendly voice', gender: 'female' },
+      'arfa': { name: 'Arfa', description: 'Professional female speaker - confident and clear voice', gender: 'female' },
+      'asmr': { name: 'ASMR', description: 'ASMR style speaker - soft and calming whisper voice', gender: 'special' },
+      'nikita': { name: 'Nikita', description: 'Youthful female speaker - bright and cheerful voice', gender: 'female' },
+      'raju': { name: 'Raju', description: 'Relatable male speaker - casual and approachable voice', gender: 'male' },
+      'rhea': { name: 'Rhea', description: 'Late-night girlfriend speaker - sultry and soothing voice', gender: 'female' },
+      'ruhaan': { name: 'Ruhaan', description: 'Mature male speaker - deep and authoritative voice', gender: 'male' },
+      'sangeeta': { name: 'Sangeeta', description: 'Warm female speaker - gentle and nurturing voice', gender: 'female' },
+      'shayana': { name: 'Shayana', description: 'Customer care female speaker - polite and helpful voice (default)', gender: 'female' }
+    };
+    return speakerData[speakerId] || { name: speakerId.charAt(0).toUpperCase() + speakerId.slice(1), description: 'Hindi voice', gender: 'unknown' };
+  };
+
+  // Capitalize first letter of speaker name for display (kept for backward compatibility)
   const formatSpeakerName = (name) => {
-    return name.charAt(0).toUpperCase() + name.slice(1);
+    const metadata = getSpeakerMetadata(name);
+    return metadata.name;
   };
   
   return (
@@ -411,26 +470,84 @@ function App() {
                       value={speakerId}
                       onChange={(e) => setSpeakerId(e.target.value)}
                       disabled={availableSpeakers.length === 0 || isWarmingUp}
+                      className="enhanced-speaker-select"
                     >
                       {availableSpeakers.length > 0 ? (
-                        availableSpeakers.map(speaker => (
-                          <option key={speaker} value={speaker}>
-                            {formatSpeakerName(speaker)}
-                          </option>
-                        ))
+                        <>
+                          {/* Group speakers by type */}
+                          <optgroup label="Female Voices">
+                            {availableSpeakers
+                              .filter(speaker => getSpeakerMetadata(speaker).gender === 'female')
+                              .map(speaker => {
+                                const metadata = getSpeakerMetadata(speaker);
+                                return (
+                                  <option key={speaker} value={speaker}>
+                                    {metadata.name} - {metadata.description}
+                                  </option>
+                                );
+                              })
+                            }
+                          </optgroup>
+                          <optgroup label="Male Voices">
+                            {availableSpeakers
+                              .filter(speaker => getSpeakerMetadata(speaker).gender === 'male')
+                              .map(speaker => {
+                                const metadata = getSpeakerMetadata(speaker);
+                                return (
+                                  <option key={speaker} value={speaker}>
+                                    {metadata.name} - {metadata.description}
+                                  </option>
+                                );
+                              })
+                            }
+                          </optgroup>
+                          <optgroup label="Special Voices">
+                            {availableSpeakers
+                              .filter(speaker => getSpeakerMetadata(speaker).gender === 'special')
+                              .map(speaker => {
+                                const metadata = getSpeakerMetadata(speaker);
+                                return (
+                                  <option key={speaker} value={speaker}>
+                                    {metadata.name} - {metadata.description}
+                                  </option>
+                                );
+                              })
+                            }
+                          </optgroup>
+                          {/* Fallback for any ungrouped speakers */}
+                          {availableSpeakers
+                            .filter(speaker => !['female', 'male', 'special'].includes(getSpeakerMetadata(speaker).gender))
+                            .map(speaker => {
+                              const metadata = getSpeakerMetadata(speaker);
+                              return (
+                                <option key={speaker} value={speaker}>
+                                  {metadata.name} - {metadata.description}
+                                </option>
+                              );
+                            })
+                          }
+                        </>
                       ) : (
                         <option value="">Loading voices...</option>
                       )}
                     </select>
                     <button 
                       className="refresh-button" 
-                      onClick={fetchApiInfo} 
+                      onClick={() => { fetchApiInfo(); fetchSpeakerDetails(); }}
                       title="Refresh speakers list"
                       disabled={isWarmingUp}
                     >
                       ⟳
                     </button>
                   </div>
+                  {/* Speaker info display */}
+                  {speakerId && (
+                    <div className="speaker-info">
+                      <span className="speaker-details">
+                        {getSpeakerMetadata(speakerId).description}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="advanced-toggle">
@@ -545,7 +662,7 @@ function App() {
                   {/* Debug info for API connection issues */}
                   {availableSpeakers.length === 0 && !isWarmingUp && (
                     <div className="debug-info">
-                      <p>Having trouble connecting to the API? Try these steps:</p>
+                      <p>Having trouble connecting to the 10-speaker API? Try these steps:</p>
                       <ol>
                         <li>Click the refresh button next to the voice dropdown</li>
                         <li>Check if your browser is blocking cross-origin requests</li>
@@ -555,7 +672,7 @@ function App() {
                         className="manual-fallback-btn"
                         onClick={setFallbackSpeakers}
                       >
-                        Use Fallback Speakers
+                        Use Fallback Speakers (10 voices)
                       </button>
                     </div>
                   )}

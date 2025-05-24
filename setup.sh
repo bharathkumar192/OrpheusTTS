@@ -14,10 +14,10 @@ apt update && sudo apt install git-lfs && git lfs install --system
 
 # Log in to Wandb
 echo "Logging in to Wandb..."
-wandb login 
+wandb login <token>
 
 # Log in to Huggingface
 echo "Logging in to Huggingface..."
 # huggingface-cli login 
-huggingface-cli login --token   --add-to-git-credential
+huggingface-cli login --token <token>  --add-to-git-credential
 echo "Setup complete!" 

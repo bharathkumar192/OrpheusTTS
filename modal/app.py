@@ -15,12 +15,12 @@ from pydantic import BaseModel, Field, validator
 from typing import Optional
 
 # --- Configuration Constants ---
-MODEL_ID = "bharathkumar1922001/orpheus-3b-hi-shayana-raju-6.4ksteps-39ksamples"
+MODEL_ID = "bharathkumar1922001/10speaker-aws-9ksteps-7epochs-8B2G"
 ORPHEUS_CACHE_PATH = "/model_cache/orpheus" # Internal cache path within the container
 SNAC_CACHE_PATH = "/model_cache/snac"     # Internal cache path within the container
 
-# Define available speakers for the model
-AVAILABLE_SPEAKERS = ["shayana", "raju"]
+# Define available speakers for the model - Updated to support all 10 speakers
+AVAILABLE_SPEAKERS = ["aisha", "anika", "arfa", "asmr", "nikita", "raju", "rhea", "ruhaan", "sangeeta", "shayana"]
 DEFAULT_SPEAKER = "shayana"  # Set default speaker to one that exists in the model
 
 SNAC_MODEL_NAME = "hubertsiuzdak/snac_24khz"
@@ -128,7 +128,7 @@ orpheus_image = (
     .pip_install([
         "transformers", "huggingface_hub", "hf_transfer",
         "snac",  # Corrected package name for SNAC
-        "soundfile", "numpy", "scipy",
+        "soundfile", "numpy", "scipy", "hf_xet",
         "fastapi", "uvicorn[standard]", "pydantic",
     ])
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}) # For snapshot_download
@@ -139,7 +139,7 @@ orpheus_image = (
     )
 )
 
-app = modal.App("orpheus-tts-api-refined-v2") # Renamed app for clarity
+app = modal.App("orpheus-tts-api-10speakers-v2") # Updated app name for 10-speaker support
 
 @app.cls(
     gpu=GPU_CONFIG, 
@@ -151,9 +151,9 @@ app = modal.App("orpheus-tts-api-refined-v2") # Renamed app for clarity
 class OrpheusTTSAPI:
     def __init__(self):
         self.web_app = fastapi.FastAPI(
-            title="Orpheus TTS API (Refined V2)", 
-            description="Text-to-Speech using Orpheus and SNAC.",
-            version="1.2.0"
+            title="Orpheus TTS API - 10 Speakers (Refined V2)", 
+            description="Text-to-Speech using Orpheus and SNAC with support for 10 Hindi speakers: aisha, anika, arfa, asmr, nikita, raju, rhea, ruhaan, sangeeta, shayana.",
+            version="2.0.0"
         )
         self.web_app.add_middleware(
             CORSMiddleware, allow_origins=["*"], allow_credentials=True,
@@ -180,13 +180,14 @@ class OrpheusTTSAPI:
         @self.web_app.get("/")
         async def root():
             return {
-                "message": "Orpheus TTS API (Refined V2) is running.", 
+                "message": "Orpheus TTS API - 10 Speakers (Refined V2) is running.", 
                 "model_id": MODEL_ID,
                 "snac_model_id": SNAC_MODEL_NAME, 
                 "gpu_config": GPU_CONFIG,
                 "flash_attention_available": self.flash_attn_available, # Set in @modal.enter
                 "available_speakers": AVAILABLE_SPEAKERS,
                 "default_speaker": DEFAULT_SPEAKER,
+                "total_speakers": len(AVAILABLE_SPEAKERS),
                 "docs_url": "/docs" # FastAPI typically serves docs here
             }
 
@@ -194,6 +195,27 @@ class OrpheusTTSAPI:
         async def health_check():
             # Could add more sophisticated checks (e.g., model responsiveness)
             return {"status": "healthy", "timestamp": time.time()}
+
+        @self.web_app.get("/speakers")
+        async def get_speakers():
+            """Get detailed information about available speakers"""
+            return {
+                "available_speakers": AVAILABLE_SPEAKERS,
+                "default_speaker": DEFAULT_SPEAKER,
+                "total_speakers": len(AVAILABLE_SPEAKERS),
+                "speaker_descriptions": {
+                    "aisha": "Girlfriend female speaker - warm and intimate voice",
+                    "anika": "Social female speaker - energetic and friendly voice", 
+                    "arfa": "Professional female speaker - confident and clear voice",
+                    "asmr": "ASMR style speaker - soft and calming whisper voice",
+                    "nikita": "Youthful female speaker - bright and cheerful voice",
+                    "raju": "Relatable male speaker - casual and approachable voice",
+                    "rhea": "Late-night girlfriend speaker - sultry and soothing voice", 
+                    "ruhaan": "Mature male speaker - deep and authoritative voice",
+                    "sangeeta": "Warm female speaker - gentle and nurturing voice",
+                    "shayana": "Customer care female speaker - polite and helpful voice (default)"
+                }
+            }
 
     @modal.enter()
     def load_all_models_and_tokenizer(self):

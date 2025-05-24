@@ -296,66 +296,121 @@ body, html {
 
 /* Speaker Selection */
 .speaker-selection {
+  margin: 1.5rem 0;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .speaker-selection label {
+  color: var(--green-bright);
+  font-weight: 500;
   font-size: 1rem;
-  color: var(--text-white);
 }
 
 .select-with-refresh {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
-  flex-grow: 1;
-}
-
-.speaker-selection select {
-  background-color: rgba(8, 10, 12, 0.8);
-  color: var(--text-white);
-  border: 1px solid rgba(29, 185, 84, 0.2);
-  border-radius: var(--border-radius);
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: var(--transition-standard);
-  flex-grow: 1;
-}
-
-.speaker-selection select:focus {
-  outline: none;
-  border-color: var(--green-glow);
-  box-shadow: 0 0 10px rgba(29, 185, 84, 0.3);
+  align-items: flex-start;
 }
 
 .refresh-button {
-  background-color: rgba(8, 10, 12, 0.8);
+  background-color: rgba(13, 17, 23, 0.8);
   color: var(--green-bright);
-  border: 1px solid rgba(29, 185, 84, 0.2);
+  border: 1px solid rgba(29, 185, 84, 0.3);
   border-radius: var(--border-radius);
-  width: 32px;
-  height: 32px;
+  width: 45px;
+  height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: var(--transition-standard);
   font-size: 1.2rem;
+  flex-shrink: 0;
 }
 
 .refresh-button:hover:not(:disabled) {
   background-color: rgba(29, 185, 84, 0.15);
-  border-color: var(--green-glow);
+  border-color: var(--green-bright);
   transform: rotate(180deg);
 }
 
 .refresh-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.enhanced-speaker-select {
+  background-color: rgba(13, 17, 23, 0.8);
+  color: var(--text-white);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  font-size: 1rem;
+  flex: 1;
+  transition: var(--transition-standard);
+  min-height: 45px;
+}
+
+.enhanced-speaker-select:focus {
+  outline: none;
+  border-color: var(--green-bright);
+  box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+}
+
+.enhanced-speaker-select optgroup {
+  background-color: rgba(13, 17, 23, 0.95);
+  color: var(--green-bright);
+  font-weight: bold;
+  font-size: 0.9rem;
+  padding: 0.5rem 0;
+}
+
+.enhanced-speaker-select optgroup option {
+  background-color: rgba(13, 17, 23, 0.9);
+  color: var(--text-white);
+  font-weight: normal;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+}
+
+.enhanced-speaker-select option:hover,
+.enhanced-speaker-select option:checked {
+  background-color: rgba(29, 185, 84, 0.2);
+  color: var(--green-bright);
+}
+
+.speaker-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(29, 185, 84, 0.05);
+  border: 1px solid rgba(29, 185, 84, 0.15);
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+}
+
+.speaker-details {
+  color: var(--text-gray);
+  font-style: italic;
+}
+
+/* Enhanced speaker selection for legacy support */
+.speaker-selection select {
+  background-color: rgba(13, 17, 23, 0.8);
+  color: var(--text-white);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  font-size: 1rem;
+  flex: 1;
+  transition: var(--transition-standard);
+}
+
+.speaker-selection select:focus {
+  outline: none;
+  border-color: var(--green-bright);
+  box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
 }
 
 /* Advanced Options Toggle */
