@@ -4,7 +4,7 @@ echo "Setting up environment..."
 
 # Install required Python packages
 echo "Installing Python packages..."
-pip install transformers datasets wandb trl accelerate torch huggingface_hub snac wave numpy librosa soundfile flash-attn orpheus-speech "vllm>=0.4.0" deepspeed
+pip install transformers datasets wandb trl accelerate torch huggingface_hub snac wave numpy librosa soundfile orpheus-speech "vllm>=0.4.0"
 
 
 # For faster training (requires compatible GPU and CUDA toolkit)
@@ -14,10 +14,10 @@ apt update && sudo apt install git-lfs && git lfs install --system
 
 # Log in to Wandb
 echo "Logging in to Wandb..."
-wandb login <wandb_token>
+wandb login 
 
 # Log in to Huggingface
 echo "Logging in to Huggingface..."
 # huggingface-cli login 
-huggingface-cli login --token <hf_token>  --add-to-git-credential
+huggingface-cli login --token   --add-to-git-credential
 echo "Setup complete!" 

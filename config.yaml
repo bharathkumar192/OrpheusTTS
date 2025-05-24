@@ -1,21 +1,29 @@
 # config.yaml (FOR AISHA - "VERY GOOD" VERIFICATION RUN on 2xH200 SXM)
 
 # --- Dataset and Model ---
-TTS_dataset: "bharathkumar1922001/aisha-asmr-zadok-anika-ivanna-raju-sia-sangeeta-brittany-rhea-shyam-shayana-knoxdork-nikita" # Output from your latest preprocess.py
+TTS_dataset: "bharathkumar1922001/processed-hindi-data-combined" # Output from your latest preprocess.py
 model_name: "canopylabs/3b-hi-pretrain-research_release"
 
 # --- Speaker Filtering ---
 speakers_to_train:
-  - "shayana"
+  - "aisha"
+  - "anika"
+  - "arfa"
+  - "asmr"
+  - "nikita"
   - "raju"
+  - "rhea"
+  - "ruhaan"
+  - "sangeeta"
+  - "shayana"
 
 # --- Training Arguments ---
-epochs: 25 # Increased for a more thorough run to ensure learning.
+epochs: 30 # Increased for a more thorough run to ensure learning.
            # Can go up to 15-20 if loss is still decreasing well.
-per_device_train_batch_size: 16 # With H200 VRAM, you can likely go much higher. Start with 16.
+per_device_train_batch_size: 32 # With H200 VRAM, you can likely go much higher. Start with 16.
                                 # Max possible might be 24 or even 32 if using gradient_checkpointing.
                                 # Test with 16, then try 20, 24 if no OOM.
-gradient_accumulation_steps: 4  # Target Global Effective BS = 16 * 2 * 4 = 128
+gradient_accumulation_steps: 8  # Target Global Effective BS = 16 * 2 * 4 = 128
                                 # If per_device_bs=24, GAS=1 -> GlobalEffBS=48
                                 # If per_device_bs=24, GAS=2 -> GlobalEffBS=96 (Good target)
 
@@ -51,13 +59,13 @@ bf16: true # H200 supports bf16 excellently.
 # fp16: false # Not needed if bf16 is true and supported.
 
 # --- Naming and Paths for this Run ---
-save_folder: "checkpoints_aisha_H200_good_run_v1"
-project_name: "FT-orpheus-aisha-H200"
-run_name: "aisha-H200-bs16x2x2-lr3e-5-gc-ep10" # bs<per_dev>x<gas>x<num_gpus>
+save_folder: "checkpoints_runpod_4_h200"
+project_name: "FT-orpheus-10speakers-H200"
+run_name: "10-speakers-4-H200-bs32x8x2-lr3e-5-gc-ep30" # bs<per_dev>x<gas>x<num_gpus>
 
 # --- Hugging Face Hub Push Configuration ---
 push_to_hub: true
-hub_model_id: "bharathkumar1922001/orpheus-shayana-raju-H200-25E-v1" # New model ID for this good run
+hub_model_id: "bharathkumar1922001/orpheus-10speakers-H200-30E-v1" # New model ID for this good run
 hub_private_repo: true
 
 
@@ -68,8 +76,7 @@ generate_test_samples_every_n_steps: 1000 # Generate every N steps (e.g., 1000).
 # generate_test_samples_every_n_steps: null # Alternative to disable
 generate_for_all_speakers: true # Generate samples for all speakers in speakers_to_train
 test_generation_prompts: # List of prompts to generate
-  - "नमस्ते, आप कैसे हैं?"
-  - "आज का मौसम बहुत अच्छा है।"
-  - "यह एक परीक्षण नमूना है।"
-# target_speaker_for_generation is now deprecated in favor of generate_for_all_speakers
-# target_speaker_for_generation: "aisha" 
+  - "आज मैंने एक नई तकनीक के बारे में सीखा जो कृत्रिम बुद्धिमत्ता का उपयोग करके मानव जैसी आवाज़ उत्पन्न कर सकती है।" # Aaj maine ek nai takneek ke bare mein seekha jo kritrim buddhimatta ka upyog karke manav jaisi awaaz utpann kar sakti hai.
+  - "यह प्रणाली विभिन्न भाषाओं में बातचीत कर सकती है और प्राकृतिक भाषा प्रसंस्करण के माध्यम से जटिल वाक्यों को समझ सकती है।" # Yeh pranali vibhinn bhashaon mein baatcheet kar sakti hai aur prakritik bhasha prasanskaran ke madhyam se jatil vakyon ko samajh sakti hai.
+  - "मैं आपको बता रहा हूं कि यह तकनीक कितनी उपयोगी है और कैसे यह हमारे जीवन को बेहतर बना सकती है।" # Main aapko bata raha hoon ki yeh takneek kitni upyogi hai aur kaise yeh hamare jeevan ko behtar bana sakti hai.
+  - "इस तकनीक का उपयोग शिक्षा, स्वास्थ्य सेवा और व्यवसाय जैसे विभिन्न क्षेत्रों में किया जा सकता है।" # Is takneek ka upyog shiksha, swasthya seva aur vyavasay jaise vibhinn kshetron mein kiya ja sakta hai.

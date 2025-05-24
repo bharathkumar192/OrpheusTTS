@@ -1,0 +1,127 @@
+# config.yaml (OPTIMIZED FOR 8x H100 SETUP - HINDI TTS FINETUNING)
+
+# --- Dataset and Model ---
+TTS_dataset: "bharathkumar1922001/processed-hindi-data-combined" # 336,460 total samples
+model_name: "canopylabs/3b-hi-pretrain-research_release" # ~3.3B parameters
+
+# --- Speaker Filtering ---
+speakers_to_train:
+  - "aisha"     # 19,853 samples
+  - "anika"     # 19,853 samples  
+  - "arfa"      # 19,853 samples
+  - "asmr"      # 19,853 samples
+  - "nikita"    # 19,853 samples
+  - "raju"      # 19,853 samples
+  - "rhea"      # 19,853 samples
+  - "ruhaan"    # 19,853 samples
+  - "sangeeta"  # 19,853 samples
+  - "shayana"   # 19,853 samples
+
+# --- Training Arguments (OPTIMIZED FOR 8x H100) ---
+epochs: 20                           # Reduced for efficiency with large batch
+per_device_train_batch_size: 8       # Optimized to avoid OOM
+gradient_accumulation_steps: 2       # Global batch size = 8 * 2 * 8 = 128
+# With 197,748 samples: ~1,546 steps/epoch, ~30,920 total steps
+
+pad_token: 128263
+learning_rate: 2.5e-5               # Adjusted for new batch size
+weight_decay: 0.01
+warmup_steps: 1546                  # ~5% of total steps (30,920 * 0.05)
+lr_scheduler_type: "cosine"
+
+# --- Saving and Logging ---
+save_strategy: "steps"
+save_steps: 1546                    # Once per epoch
+save_total_limit: 3
+logging_steps: 50                   # More frequent logging
+logging_first_step: true
+
+# --- Dataset Configuration ---
+num_train_samples: -1               # Use all available samples
+max_seq_length: 2048                # Cover 99th percentile (1,829) with buffer
+
+# --- Data Sanity Check ---
+perform_data_check: true
+num_samples_to_check: 10
+
+# --- Advanced Training Options (OPTIMIZED FOR H100) ---
+gradient_checkpointing: true        # Essential for memory efficiency
+bf16: true                          # H100 optimized precision
+dataloader_num_workers: 4           # Reduced to avoid conflicts
+dataloader_pin_memory: true         # GPU transfer optimization
+remove_unused_columns: false       # Keep all columns for speaker info
+
+# --- Weights & Biases Configuration ---
+use_wandb: true
+wandb_project: "orpheus-hindi-tts-8xH100"
+wandb_run_name: "10spk-8xH100-bs8x4x8-lr2.5e-5-zs2-ep20-oom-fixed"
+wandb_entity: null                  # Set to your wandb username/team if needed
+wandb_mode: "online"               # Force online mode
+wandb_tags: ["hindi-tts", "orpheus", "8xH100", "deepspeed", "10-speakers", "oom-fixed"]
+wandb_notes: "OOM Fixed Hindi TTS training on 8x H100 GPUs with DeepSpeed ZeRO-2"
+report_to: ["wandb", "tensorboard"] # Enable both wandb and tensorboard reporting
+
+# --- DeepSpeed Configuration ---
+use_deepspeed: true
+deepspeed_config: {
+  "zero_optimization": {
+    "stage": 2,                     # ZeRO-2 for 8 GPUs with 3.3B model
+    "allgather_partitions": true,
+    "allgather_bucket_size": 2e8,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 2e8,
+    "contiguous_gradients": true
+  },
+  "bf16": {
+    "enabled": true
+  },
+  "optimizer": {
+    "type": "AdamW",
+    "params": {
+      "lr": 2.5e-5,
+      "betas": [0.9, 0.999],
+      "eps": 1e-8,
+      "weight_decay": 0.01
+    }
+  },
+  "scheduler": {
+    "type": "WarmupCosineLR",
+    "params": {
+      "warmup_min_lr": 0,
+      "warmup_max_lr": 2.5e-5,
+      "warmup_num_steps": 1546,
+      "total_num_steps": 30920
+    }
+  },
+  "train_batch_size": 128,          # 8 * 2 * 8 GPUs
+  "train_micro_batch_size_per_gpu": 8,
+  "gradient_accumulation_steps": 2,
+  "steps_per_print": 50,
+  "wall_clock_breakdown": false
+}
+
+# --- Naming and Paths ---
+save_folder: "AWS_8xH100"
+project_name: "FT-orpheus-10speakers-8xH100"
+run_name: "10spk-8xH100-bs8x4x8-lr2.5e-5-zs2-ep20"
+
+# --- Hugging Face Hub Push Configuration ---
+push_to_hub: true
+hub_model_id: "bharathkumar1922001/orpheus-10speakers-8xH100-oom-fixed-v1"
+hub_private_repo: true
+
+# --- Callback: Test Sample Generation ---
+generate_test_samples_on_save: true
+generate_test_samples_every_n_steps: 3092  # Every 2 epochs
+generate_for_all_speakers: true
+test_generation_prompts:
+  - "आज मैंने एक नई तकनीक के बारे में सीखा जो कृत्रिम बुद्धिमत्ता का उपयोग करके मानव जैसी आवाज़ उत्पन्न कर सकती है।"
+  - "यह प्रणाली विभिन्न भाषाओं में बातचीत कर सकती है और प्राकृतिक भाषा प्रसंस्करण के माध्यम से जटिल वाक्यों को समझ सकती है।"
+  - "मैं आपको बता रहा हूं कि यह तकनीक कितनी उपयोगी है और कैसे यह हमारे जीवन को बेहतर बना सकती है।"
+  - "इस तकनीक का उपयोग शिक्षा, स्वास्थ्य सेवा और व्यवसाय जैसे विभिन्न क्षेत्रों में किया जा सकता है।"
+
+# --- Memory Optimization ---
+gradient_checkpointing_kwargs: {
+  "use_reentrant": false            # Better memory efficiency with newer PyTorch
+}
