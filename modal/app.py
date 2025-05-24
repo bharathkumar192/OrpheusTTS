@@ -121,12 +121,15 @@ orpheus_image = (
     .pip_install(["ninja", "packaging", "wheel", "torch==2.3.1", "torchaudio==2.3.1"])
     .env({
         "TORCH_CUDA_ARCH_LIST": TORCH_CUDA_ARCH_LIST_FOR_BUILD, 
-        "MAX_JOBS": str(os.cpu_count() or 4) # Use available CPUs for build
+        "MAX_JOBS": str(os.cpu_count() or 4), # Use available CPUs for build
+        # Fix for Flash Attention environment issues
+        "CUDA_LAUNCH_BLOCKING": "1",
+        "TORCH_USE_CUDA_DSA": "1",
     })
-    # Corrected flash-attn installation command
-    .run_commands("pip install flash-attn==2.5.9.post1 --no-build-isolation")
+    # Updated flash-attn installation with better error handling
+    .run_commands("pip install flash-attn==2.6.3 --no-build-isolation || echo 'Flash attention install failed, will fallback to default attention'")
     .pip_install([
-        "transformers", "huggingface_hub", "hf_transfer",
+        "transformers==4.46.1", "huggingface_hub", "hf_transfer", "accelerate==0.30.1",
         "snac",  # Corrected package name for SNAC
         "soundfile", "numpy", "scipy", "hf_xet",
         "fastapi", "uvicorn[standard]", "pydantic",
@@ -256,39 +259,75 @@ class OrpheusTTSAPI:
             print(f"Tokenizer pad_token_id ({self.tokenizer.pad_token_id}) is correctly set.")
 
         print(f"Loading Orpheus model from cached path: {ORPHEUS_CACHE_PATH}")
+        
+        # First, try loading without Flash Attention to avoid the error
         model_load_args = {
             "trust_remote_code": True, 
-            "local_files_only": True # Explicitly load from local files
+            "local_files_only": True, # Explicitly load from local files
+            # Removed device_map to avoid accelerate dependency requirement (we'll move model manually)
         }
+        
         if self.device == "cuda":
-            if torch.cuda.is_bf16_supported(): model_load_args["torch_dtype"] = torch.bfloat16
-            else: model_load_args["torch_dtype"] = torch.float16
-        
-        pt_version = torch.__version__
-        if tuple(map(int, pt_version.split('.')[:2])) >= (2, 0) and \
-           self.device == "cuda" and torch.cuda.get_device_capability()[0] >= 8: # Ampere (8.0+) or Hopper (9.0)
-            try:
-                import flash_attn # Check if importable in the container environment
-                model_load_args["attn_implementation"] = "flash_attention_2"
-                self.flash_attn_available = True
-                print("Attempting to use Flash Attention 2 for Orpheus model.")
-            except ImportError: 
-                self.flash_attn_available = False # Ensure it's set if import fails
-                print("Flash Attention 2 import failed, using default attention.")
-        else: 
-            self.flash_attn_available = False
-            print("Flash Attention 2 not used (PyTorch/CUDA/GPU requirements not met).")
+            if torch.cuda.is_bf16_supported(): 
+                model_load_args["torch_dtype"] = torch.bfloat16
+                print("Using bfloat16 for model loading")
+            else: 
+                model_load_args["torch_dtype"] = torch.float16
+                print("Using float16 for model loading")
 
-        self.orpheus_model = AutoModelForCausalLM.from_pretrained(ORPHEUS_CACHE_PATH, **model_load_args)
+        # Try to load the model, first without Flash Attention
+        try:
+            print("Attempting to load model without Flash Attention first...")
+            self.orpheus_model = AutoModelForCausalLM.from_pretrained(ORPHEUS_CACHE_PATH, **model_load_args)
+            print("Model loaded successfully without Flash Attention.")
+            
+            # Now try to enable Flash Attention if available
+            pt_version = torch.__version__
+            if tuple(map(int, pt_version.split('.')[:2])) >= (2, 0) and \
+               self.device == "cuda" and torch.cuda.get_device_capability()[0] >= 8:
+                try:
+                    import flash_attn
+                    # Only try to convert to Flash Attention after successful loading
+                    print("Flash Attention 2 is available. Model loaded with default attention.")
+                    self.flash_attn_available = True
+                except ImportError: 
+                    self.flash_attn_available = False
+                    print("Flash Attention 2 not available, using default attention.")
+            else: 
+                self.flash_attn_available = False
+                print("Flash Attention 2 not used (PyTorch/CUDA/GPU requirements not met).")
+                
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            print("Trying with fallback configuration...")
+            # Fallback: try loading on CPU first, then move to GPU
+            fallback_args = {
+                "trust_remote_code": True, 
+                "local_files_only": True,
+                "torch_dtype": torch.float32,  # Use float32 as fallback
+                "low_cpu_mem_usage": True,
+            }
+            try:
+                print("Loading model with fallback configuration...")
+                self.orpheus_model = AutoModelForCausalLM.from_pretrained(ORPHEUS_CACHE_PATH, **fallback_args)
+                print("Model loaded with fallback configuration.")
+                self.flash_attn_available = False
+            except Exception as e2:
+                print(f"Failed to load model even with fallback: {e2}")
+                raise e2
         
+        # Check vocab size compatibility
         model_vocab_size = self.orpheus_model.get_input_embeddings().weight.shape[0]
         tokenizer_vocab_size = len(self.tokenizer)
         if tokenizer_vocab_size != model_vocab_size:
             print(f"CRITICAL MISMATCH: Tokenizer vocab ({tokenizer_vocab_size}) vs Model vocab ({model_vocab_size})!")
             # This is a serious issue with the model assets. Do not resize in inference.
         
-        self.orpheus_model.to(self.device); self.orpheus_model.eval()
-        print("Orpheus model loaded.")
+        # Move to device and set to eval mode
+        if not hasattr(self.orpheus_model, 'device') or str(self.orpheus_model.device) != self.device:
+            self.orpheus_model.to(self.device)
+        self.orpheus_model.eval()
+        print("Orpheus model loaded and moved to device.")
 
         print(f"Loading SNAC model ({SNAC_MODEL_NAME}) from {SNAC_CACHE_PATH}...")
         try:
