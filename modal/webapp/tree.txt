@@ -1,0 +1,13 @@
+.
+├── index.html
+├── package.json
+├── src
+│   ├── main.ts
+│   ├── streaming.ts
+│   ├── styles.css
+│   └── ui.ts
+├── tree.txt
+├── tsconfig.json
+└── vite.config.ts
+
+2 directories, 9 files
