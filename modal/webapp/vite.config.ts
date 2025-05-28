@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    host: true,
+    cors: true,
+  },
   build: {
+    target: 'es2020',
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: false,
+    sourcemap: true,
     minify: 'terser',
     rollupOptions: {
       output: {
@@ -28,10 +36,8 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    port: 3000,
-    host: true,
-    cors: true,
+  css: {
+    devSourcemap: true
   },
   define: {
     // Define global constants
@@ -40,4 +46,9 @@ export default defineConfig({
   optimizeDeps: {
     include: ['motion'],
   },
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  }
 });

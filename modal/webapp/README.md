@@ -1,3 +1,9 @@
+---
+noteId: "c8836d103bae11f08c1507a08210f09e"
+tags: []
+
+---
+
 # Maya Research - Orpheus Hindi TTS Web Application
 
 A visually stunning web interface for Orpheus Hindi Text-to-Speech API, featuring a dark theme with green accents, parallax effects, and advanced audio synthesis options.

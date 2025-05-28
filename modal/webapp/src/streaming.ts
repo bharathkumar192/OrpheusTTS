@@ -1,14 +1,5 @@
-// streaming.ts - Real-time Audio Streaming Implementation
+// streaming.ts - Real-time Audio Visualization
 import { animate } from 'motion';
-
-interface Analytics {
-    ttft_s: number;
-    ttfa_s: number;
-    total_time_s: number;
-    tokens_per_second: number;
-    snac_tokens: number;
-    audio_chunks: number;
-}
 
 export class AudioStreamer {
     private canvas: HTMLCanvasElement;
@@ -18,8 +9,7 @@ export class AudioStreamer {
     private isStreaming = false;
     private audioContext: AudioContext | null = null;
     private analyser: AnalyserNode | null = null;
-    private startTime: number = 0;
-    private firstChunkTime: number = 0;
+    private streamingStartTime: number = 0;
     
     constructor() {
         this.canvas = document.getElementById('waveform-canvas') as HTMLCanvasElement;
@@ -47,6 +37,7 @@ export class AudioStreamer {
             this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.8;
         } catch (error) {
             console.warn('AudioContext initialization failed:', error);
         }
@@ -59,13 +50,13 @@ export class AudioStreamer {
         
         this.ctx.clearRect(0, 0, width, height);
         
-        // Draw placeholder waveform
-        this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+        // Draw placeholder waveform with darker theme
+        this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
         
         for (let x = 0; x < width; x += 4) {
-            const y = height / 2 + Math.sin(x * 0.02) * 10;
+            const y = height / 2 + Math.sin(x * 0.02) * 8;
             if (x === 0) {
                 this.ctx.moveTo(x, y);
             } else {
@@ -74,162 +65,46 @@ export class AudioStreamer {
         }
         
         this.ctx.stroke();
+        
+        // Add "Ready" text
+        this.ctx.fillStyle = 'rgba(163, 163, 163, 0.6)';
+        this.ctx.font = '14px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Ready to generate audio...', width / 2, height / 2 + 40);
     }
     
-    async streamGeneration(
-        text: string, 
-        speakerId: string, 
-        onChunk: (chunk: Uint8Array) => void,
-        onAnalytics: (analytics: Analytics) => void
-    ): Promise<Blob> {
-        this.startTime = performance.now();
-        this.firstChunkTime = 0;
-        this.isStreaming = true;
-        
-        // Show streaming UI
-        this.showStreamingState();
-        
-        const API_BASE = 'https://fuchr--veena-veenattsapi-asgi-app.modal.run';
-        
-        try {
-            const response = await fetch(`${API_BASE}/generate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    text,
-                    speaker_id: speakerId,
-                    streaming: true,
-                    max_new_tokens: 1536,
-                    temperature: 0.4,
-                    repetition_penalty: 1.05,
-                    top_p: 0.9
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const reader = response.body!.getReader();
-            const chunks: Uint8Array[] = [];
-            let totalBytes = 0;
-            let chunkCount = 0;
-            
-            // Read the stream
-            while (true) {
-                const { done, value } = await reader.read();
-                
-                if (done) break;
-                
-                if (value) {
-                    // Record first chunk time for TTFA
-                    if (this.firstChunkTime === 0) {
-                        this.firstChunkTime = performance.now();
-                    }
-                    
-                    chunks.push(value);
-                    totalBytes += value.length;
-                    chunkCount++;
-                    
-                    // Process chunk for real-time visualization
-                    onChunk(value);
-                    
-                    // Update streaming visualization
-                    this.updateStreamingVisualization(value);
-                }
-            }
-            
-            // Calculate analytics
-            const endTime = performance.now();
-            const totalTime = (endTime - this.startTime) / 1000;
-            const ttfa = this.firstChunkTime ? (this.firstChunkTime - this.startTime) / 1000 : 0;
-            
-            const analytics: Analytics = {
-                ttft_s: ttfa, // For audio, TTFT is essentially TTFA
-                ttfa_s: ttfa,
-                total_time_s: totalTime,
-                tokens_per_second: chunkCount / totalTime,
-                snac_tokens: chunkCount * 7, // Approximate
-                audio_chunks: chunkCount
-            };
-            
-            onAnalytics(analytics);
-            
-            // Combine all chunks into a single blob
-            const audioBlob = new Blob(chunks, { type: 'audio/wav' });
-            
-            // Hide streaming state
-            this.hideStreamingState();
-            
-            return audioBlob;
-            
-        } catch (error) {
-            this.hideStreamingState();
-            throw error;
-        } finally {
-            this.isStreaming = false;
-        }
-    }
-    
-    private showStreamingState() {
-        const overlay = document.getElementById('waveform-overlay') as HTMLElement;
-        const canvas = this.canvas;
-        
-        // Show overlay
-        overlay.style.display = 'flex';
-        animate(overlay, { opacity: [0, 1] }, { duration: 0.3 });
-        
-        // Start wave animation
-        const dots = overlay.querySelectorAll('.dot');
-        animate(dots, 
-            { 
-                scale: [1, 1.2, 1],
-                opacity: [0.5, 1, 0.5]
-            }, 
-            { 
-                duration: 1.5, 
-                repeat: Infinity,
-                delay: stagger(0.2)
-            }
-        );
-        
-        // Clear canvas for streaming
-        const rect = this.canvas.getBoundingClientRect();
-        this.ctx.clearRect(0, 0, rect.width, rect.height);
-        
-        // Start real-time waveform animation
-        this.startWaveformAnimation();
-    }
-    
-    private hideStreamingState() {
-        const overlay = document.getElementById('waveform-overlay') as HTMLElement;
-        
-        animate(overlay, { opacity: [1, 0] }, { duration: 0.3 }).finished.then(() => {
-            overlay.style.display = 'none';
-        });
-        
-        this.stopWaveformAnimation();
-    }
-    
-    private updateStreamingVisualization(chunk: Uint8Array) {
+    updateWaveform(chunk: Uint8Array) {
         // Convert audio chunk to waveform data
         const samples = this.extractAudioSamples(chunk);
-        this.waveformData.push(...samples);
         
-        // Keep only recent data to prevent memory issues
-        if (this.waveformData.length > 1000) {
-            this.waveformData = this.waveformData.slice(-1000);
+        if (samples.length > 0) {
+            this.waveformData.push(...samples);
+            
+            // Keep only recent data to prevent memory issues
+            if (this.waveformData.length > 2000) {
+                this.waveformData = this.waveformData.slice(-2000);
+            }
+            
+            // Start visualization if not already running
+            if (!this.isStreaming) {
+                this.streamingStartTime = performance.now();
+                this.startWaveformAnimation();
+            }
         }
     }
     
     private extractAudioSamples(chunk: Uint8Array): number[] {
-        // For WAV format, we need to skip the header and extract PCM data
         const samples: number[] = [];
+        let startOffset = 0;
         
-        // Simple approach: treat as 16-bit PCM data
-        for (let i = 44; i < chunk.length - 1; i += 2) {
+        // Check if this chunk contains a WAV header (first chunk typically does)
+        if (chunk.length > 44 && 
+            chunk[0] === 82 && chunk[1] === 73 && chunk[2] === 70 && chunk[3] === 70) { // "RIFF"
+            startOffset = 44; // Skip WAV header
+        }
+        
+        // Process as 16-bit PCM data
+        for (let i = startOffset; i < chunk.length - 1; i += 2) {
             const sample = (chunk[i] | (chunk[i + 1] << 8));
             // Convert to signed 16-bit
             const signedSample = sample > 32767 ? sample - 65536 : sample;
@@ -237,24 +112,39 @@ export class AudioStreamer {
             samples.push(signedSample / 32768);
         }
         
-        return samples.filter((_, index) => index % 10 === 0); // Downsample for visualization
+        // More aggressive downsampling for smoother visualization
+        return samples.filter((_, index) => index % 8 === 0);
     }
     
     private startWaveformAnimation() {
+        this.isStreaming = true;
+        
         const animate = () => {
             if (!this.isStreaming) return;
             
             this.drawRealtimeWaveform();
             this.animationFrame = requestAnimationFrame(animate);
         };
-        animate();
+        
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+        }
+        
+        this.animationFrame = requestAnimationFrame(animate);
     }
     
-    private stopWaveformAnimation() {
+    stopWaveformAnimation() {
+        this.isStreaming = false;
+        
         if (this.animationFrame) {
             cancelAnimationFrame(this.animationFrame);
             this.animationFrame = null;
         }
+        
+        // Draw final static waveform
+        setTimeout(() => {
+            this.drawFinalWaveform();
+        }, 100);
     }
     
     private drawRealtimeWaveform() {
@@ -264,20 +154,37 @@ export class AudioStreamer {
         
         this.ctx.clearRect(0, 0, width, height);
         
-        if (this.waveformData.length === 0) return;
+        if (this.waveformData.length === 0) {
+            this.drawStreamingIndicator();
+            return;
+        }
         
-        // Draw streaming waveform
-        this.ctx.strokeStyle = '#6366f1';
-        this.ctx.lineWidth = 2;
+        // Create gradient for the waveform
+        const gradient = this.ctx.createLinearGradient(0, 0, width, 0);
+        const elapsed = (performance.now() - this.streamingStartTime) / 1000;
+        
+        // Animate gradient colors during streaming
+        const hue1 = (elapsed * 30) % 360;
+        const hue2 = (elapsed * 30 + 60) % 360;
+        gradient.addColorStop(0, `hsl(${hue1}, 70%, 60%)`);
+        gradient.addColorStop(0.5, '#6366f1');
+        gradient.addColorStop(1, `hsl(${hue2}, 70%, 60%)`);
+        
+        // Draw streaming waveform with flowing effect
+        this.ctx.strokeStyle = gradient;
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
         this.ctx.beginPath();
         
         const samplesPerPixel = Math.max(1, Math.floor(this.waveformData.length / width));
+        const scrollOffset = elapsed * 50; // Scrolling effect
         
         for (let x = 0; x < width; x++) {
-            const dataIndex = Math.floor((x / width) * this.waveformData.length);
+            const dataIndex = Math.floor(((x + scrollOffset) / width) * this.waveformData.length) % this.waveformData.length;
             
             if (dataIndex < this.waveformData.length) {
-                // Get RMS of samples for this pixel
+                // Calculate RMS with some smoothing
                 let sum = 0;
                 let count = 0;
                 
@@ -287,8 +194,8 @@ export class AudioStreamer {
                 }
                 
                 const rms = count > 0 ? sum / count : 0;
-                const y = height / 2 - (rms * height * 0.4);
-                const y2 = height / 2 + (rms * height * 0.4);
+                const amplitude = rms * height * 0.35;
+                const y = height / 2 - amplitude;
                 
                 if (x === 0) {
                     this.ctx.moveTo(x, y);
@@ -303,7 +210,7 @@ export class AudioStreamer {
         // Draw mirror for bottom half
         this.ctx.beginPath();
         for (let x = 0; x < width; x++) {
-            const dataIndex = Math.floor((x / width) * this.waveformData.length);
+            const dataIndex = Math.floor(((x + scrollOffset) / width) * this.waveformData.length) % this.waveformData.length;
             
             if (dataIndex < this.waveformData.length) {
                 let sum = 0;
@@ -315,7 +222,8 @@ export class AudioStreamer {
                 }
                 
                 const rms = count > 0 ? sum / count : 0;
-                const y2 = height / 2 + (rms * height * 0.4);
+                const amplitude = rms * height * 0.35;
+                const y2 = height / 2 + amplitude;
                 
                 if (x === 0) {
                     this.ctx.moveTo(x, y2);
@@ -329,12 +237,15 @@ export class AudioStreamer {
         
         // Add glow effect
         this.ctx.shadowColor = '#6366f1';
-        this.ctx.shadowBlur = 10;
+        this.ctx.shadowBlur = 20;
+        this.ctx.globalAlpha = 0.6;
         this.ctx.stroke();
         this.ctx.shadowBlur = 0;
+        this.ctx.globalAlpha = 1;
         
-        // Add streaming indicator
+        // Add streaming indicator and status
         this.drawStreamingIndicator();
+        this.drawStreamingStatus();
     }
     
     private drawStreamingIndicator() {
@@ -343,23 +254,96 @@ export class AudioStreamer {
         const height = rect.height;
         
         // Animated streaming line
-        const time = Date.now() * 0.003;
-        const x = (Math.sin(time) * 0.5 + 0.5) * width;
+        const time = Date.now() * 0.005;
+        const x = (Math.sin(time) * 0.3 + 0.7) * width;
         
         this.ctx.strokeStyle = '#10b981';
-        this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([5, 5]);
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([8, 8]);
+        this.ctx.lineDashOffset = time * 20;
+        this.ctx.globalAlpha = 0.8;
         this.ctx.beginPath();
-        this.ctx.moveTo(x, 0);
-        this.ctx.lineTo(x, height);
+        this.ctx.moveTo(x, 20);
+        this.ctx.lineTo(x, height - 20);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
+        this.ctx.globalAlpha = 1;
     }
     
-    updateWaveform(chunk: Uint8Array) {
-        // This method is called from the main app for each chunk
-        // We handle the visualization in updateStreamingVisualization
-        this.updateStreamingVisualization(chunk);
+    private drawStreamingStatus() {
+        const rect = this.canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        
+        // "LIVE" indicator
+        this.ctx.fillStyle = '#ef4444';
+        this.ctx.fillRect(width - 80, 20, 8, 8);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('LIVE', width - 65, 28);
+        
+        // Streaming status
+        const elapsed = (performance.now() - this.streamingStartTime) / 1000;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        this.ctx.font = '11px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`Streaming: ${elapsed.toFixed(1)}s`, 20, height - 25);
+        this.ctx.fillText(`Samples: ${this.waveformData.length}`, 20, height - 10);
+    }
+    
+    private drawFinalWaveform() {
+        if (this.waveformData.length === 0) return;
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        
+        this.ctx.clearRect(0, 0, width, height);
+        
+        // Create final gradient
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#8b5cf6');
+        gradient.addColorStop(0.5, '#6366f1');
+        gradient.addColorStop(1, '#3b82f6');
+        
+        this.ctx.strokeStyle = gradient;
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.beginPath();
+        
+        const samplesPerPixel = Math.max(1, Math.floor(this.waveformData.length / width));
+        
+        for (let x = 0; x < width; x++) {
+            const dataIndex = Math.floor((x / width) * this.waveformData.length);
+            
+            if (dataIndex < this.waveformData.length) {
+                let sum = 0;
+                let count = 0;
+                
+                for (let i = 0; i < samplesPerPixel && dataIndex + i < this.waveformData.length; i++) {
+                    sum += Math.abs(this.waveformData[dataIndex + i]);
+                    count++;
+                }
+                
+                const rms = count > 0 ? sum / count : 0;
+                const amplitude = rms * height * 0.4;
+                const y1 = height / 2 - amplitude;
+                const y2 = height / 2 + amplitude;
+                
+                this.ctx.moveTo(x, y1);
+                this.ctx.lineTo(x, y2);
+            }
+        }
+        
+        this.ctx.stroke();
+        
+        // Add completion status
+        this.ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
+        this.ctx.font = '12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText('✓ Complete', width - 20, 30);
     }
     
     // Static waveform for completed audio
@@ -370,10 +354,16 @@ export class AudioStreamer {
         
         this.ctx.clearRect(0, 0, width, height);
         
+        // Create gradient for the waveform
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#8b5cf6');
+        gradient.addColorStop(0.5, '#6366f1');
+        gradient.addColorStop(1, '#3b82f6');
+        
         const channelData = audioBuffer.getChannelData(0);
         const samplesPerPixel = Math.floor(channelData.length / width);
         
-        this.ctx.strokeStyle = '#6366f1';
+        this.ctx.strokeStyle = gradient;
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
         
@@ -398,6 +388,12 @@ export class AudioStreamer {
         }
         
         this.ctx.stroke();
+        
+        // Add glow effect
+        this.ctx.shadowColor = '#6366f1';
+        this.ctx.shadowBlur = 15;
+        this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
     }
     
     destroy() {

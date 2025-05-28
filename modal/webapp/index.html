@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veena - Professional TTS by Maya Research</title>
+    <title>Maya Research - TTS</title>
     <link rel="stylesheet" href="./src/styles.css">
+    <link rel="stylesheet" href="./src/streamingAudioPlayer.css">
 </head>
 <body>
     <!-- Status Bar -->
     <div id="status-bar" class="status-bar">
         <div class="status-left">
             <span class="company-name">Maya Research</span>
-            <span class="product-name">Veena TTS</span>
+            <span class="product-name">TTS</span>
         </div>
         <div class="status-center">
             <div id="warmup-status" class="warmup-status">
@@ -33,23 +34,8 @@
         <div id="hero-section" class="hero-section centered">
             <div class="hero-content">
                 <h1 class="hero-title">Transform Text to Voice</h1>
-                <p class="hero-subtitle">Professional Hindi TTS with 10 unique voices</p>
                 
-                <!-- Main Input Area -->
-                <div class="input-container">
-                    <textarea 
-                        id="text-input" 
-                        class="text-input" 
-                        placeholder="Type your Hindi text here..."
-                        maxlength="5000"
-                    ></textarea>
-                    <div class="input-footer">
-                        <span id="char-count" class="char-count">0 / 5000</span>
-                        <button id="clear-btn" class="clear-btn">Clear</button>
-                    </div>
-                </div>
-
-                <!-- Speaker Selection -->
+                <!-- Speaker Selection - Moved above text input -->
                 <div class="speaker-container">
                     <label class="speaker-label">Choose Voice</label>
                     <div id="speaker-dropdown" class="speaker-dropdown">
@@ -70,6 +56,130 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Main Input Area -->
+                <div class="input-container">
+                    <textarea 
+                        id="text-input" 
+                        class="text-input" 
+                        placeholder="Type your Hindi text here..."
+                        maxlength="5000"
+                    ></textarea>
+                    <div class="input-footer">
+                        <span id="char-count" class="char-count">0 / 5000</span>
+                        <button id="clear-btn" class="clear-btn">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="advanced-options">
+                    <div class="advanced-header">
+                        <button id="advanced-toggle" class="advanced-toggle">
+                            <svg class="advanced-icon" viewBox="0 0 24 24">
+                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                            </svg>
+                            <span class="advanced-label">Advanced Options</span>
+                            <svg class="advanced-arrow" viewBox="0 0 24 24">
+                                <path d="M7 10l5 5 5-5z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div id="advanced-content" class="advanced-content">
+                        <div class="advanced-grid">
+                            <!-- Max Tokens -->
+                            <div class="option-group">
+                                <label class="option-label" for="max-tokens">
+                                    Max Tokens
+                                    <span class="option-info">Length of generated audio</span>
+                                </label>
+                                <div class="slider-container">
+                                    <input 
+                                        type="range" 
+                                        id="max-tokens" 
+                                        class="option-slider"
+                                        min="512" 
+                                        max="3072" 
+                                        value="1536" 
+                                        step="128"
+                                    >
+                                    <span id="max-tokens-value" class="slider-value">1536</span>
+                                </div>
+                            </div>
+
+                            <!-- Temperature -->
+                            <div class="option-group">
+                                <label class="option-label" for="temperature">
+                                    Temperature
+                                    <span class="option-info">Creativity vs consistency</span>
+                                </label>
+                                <div class="slider-container">
+                                    <input 
+                                        type="range" 
+                                        id="temperature" 
+                                        class="option-slider"
+                                        min="0.1" 
+                                        max="1.0" 
+                                        value="0.4" 
+                                        step="0.05"
+                                    >
+                                    <span id="temperature-value" class="slider-value">0.4</span>
+                                </div>
+                            </div>
+
+                            <!-- Repetition Penalty -->
+                            <div class="option-group">
+                                <label class="option-label" for="repetition-penalty">
+                                    Repetition Penalty
+                                    <span class="option-info">Reduce repetitive speech</span>
+                                </label>
+                                <div class="slider-container">
+                                    <input 
+                                        type="range" 
+                                        id="repetition-penalty" 
+                                        class="option-slider"
+                                        min="1.0" 
+                                        max="1.5" 
+                                        value="1.05" 
+                                        step="0.05"
+                                    >
+                                    <span id="repetition-penalty-value" class="slider-value">1.05</span>
+                                </div>
+                            </div>
+
+                            <!-- Top P -->
+                            <div class="option-group">
+                                <label class="option-label" for="top-p">
+                                    Top P
+                                    <span class="option-info">Nucleus sampling threshold</span>
+                                </label>
+                                <div class="slider-container">
+                                    <input 
+                                        type="range" 
+                                        id="top-p" 
+                                        class="option-slider"
+                                        min="0.1" 
+                                        max="1.0" 
+                                        value="0.9" 
+                                        step="0.05"
+                                    >
+                                    <span id="top-p-value" class="slider-value">0.9</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reset Button -->
+                        <div class="advanced-footer">
+                            <button id="reset-advanced" class="reset-btn">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 12c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8c-2.1 0-4 .8-5.4 2.2L9 9"/>
+                                    <path d="M9 9l-3-3 3-3"/>
+                                </svg>
+                                Reset to Defaults
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Generate Button -->
                 <button id="generate-btn" class="generate-btn disabled">
@@ -84,90 +194,34 @@
                         <span>Generating...</span>
                     </div>
                 </button>
-
-                <!-- Quick Templates -->
-                <div class="quick-templates">
-                    <span class="templates-label">Quick Start:</span>
-                    <div class="template-pills">
-                        <button class="template-pill" data-text="नमस्ते, आपका दिन कैसा रहा?">Greeting</button>
-                        <button class="template-pill" data-text="धन्यवाद आपका बहुत-बहुत धन्यवाद">Thanks</button>
-                        <button class="template-pill" data-text="क्या मैं आपकी सहायता कर सकता हूं?">Assistance</button>
-                    </div>
-                </div>
             </div>
         </div>
 
-        <!-- Audio Output Section (Initially Hidden) -->
+        <!-- Audio Output Section (React Component Container) -->
         <div id="audio-section" class="audio-section hidden">
-            <div class="audio-header">
+            <!-- Analytics Display - Outside React Component -->
+            <div class="analytics-header">
                 <h3 class="audio-title">Voice Output</h3>
-                <div class="audio-actions">
-                    <button id="download-btn" class="action-btn">
+                <div class="analytics-mini-panel">
+                    <div class="metric">
+                        <span class="metric-label">TTFA</span>
+                        <span id="ttft-value" class="metric-value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Tokens/s</span>
+                        <span id="tokens-value" class="metric-value">--</span>
+                    </div>
+                    <button id="download-btn" class="download-btn">
                         <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                    </button>
-                    <button id="share-btn" class="action-btn">
-                        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+                        Download
                     </button>
                 </div>
             </div>
-
-            <!-- Waveform Visualizer -->
-            <div class="waveform-container">
-                <canvas id="waveform-canvas" class="waveform-canvas"></canvas>
-                <div id="waveform-overlay" class="waveform-overlay">
-                    <div class="wave-placeholder">
-                        <div class="wave-dots">
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                        </div>
-                        <span>Preparing audio...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Audio Controls -->
-            <div class="audio-controls">
-                <button id="play-btn" class="control-btn play">
-                    <svg class="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    <svg class="pause-icon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                </button>
-                <div class="progress-container">
-                    <div id="progress-bar" class="progress-bar">
-                        <div class="progress-fill"></div>
-                        <div class="progress-handle"></div>
-                    </div>
-                    <div class="time-display">
-                        <span id="current-time">0:00</span>
-                        <span id="total-time">0:00</span>
-                    </div>
-                </div>
-                <div class="volume-container">
-                    <svg class="volume-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                    <input id="volume-slider" type="range" min="0" max="100" value="80" class="volume-slider">
-                </div>
-            </div>
-
-            <!-- Analytics Display -->
-            <div class="analytics-panel">
-                <div class="metric">
-                    <span class="metric-label">TTFT</span>
-                    <span id="ttft-value" class="metric-value">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Quality</span>
-                    <span id="quality-value" class="metric-value">HD</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Tokens/s</span>
-                    <span id="tokens-value" class="metric-value">--</span>
-                </div>
-            </div>
+            
+            <!-- React Player Container -->
+            <div id="react-audio-player-root"></div>
         </div>
     </div>
-
-    <!-- Hidden Audio Element for Playback -->
-    <audio id="audio-player" style="display: none;"></audio>
 
     <!-- Scripts -->
     <script type="module" src="./src/main.ts"></script>

@@ -17,26 +17,22 @@ export class UIManager {
         // Set initial state
         this.setupInitialAnimations();
         this.setupParticleBackground();
-        this.setupGlassEffects();
+        this.initializeResponsive();
     }
     
     private setupInitialAnimations() {
         // Animate hero section elements on load
         const heroTitle = document.querySelector('.hero-title') as HTMLElement;
-        const heroSubtitle = document.querySelector('.hero-subtitle') as HTMLElement;
         const inputContainer = document.querySelector('.input-container') as HTMLElement;
         const speakerContainer = document.querySelector('.speaker-container') as HTMLElement;
         const generateBtn = document.getElementById('generate-btn') as HTMLElement;
-        const quickTemplates = document.querySelector('.quick-templates') as HTMLElement;
         
         // Staggered entrance animation
         timeline([
             [heroTitle, { opacity: [0, 1], y: [-20, 0] }, { duration: 0.6 }],
-            [heroSubtitle, { opacity: [0, 1], y: [-15, 0] }, { duration: 0.5, at: 0.2 }],
-            [inputContainer, { opacity: [0, 1], y: [20, 0], scale: [0.95, 1] }, { duration: 0.6, at: 0.4 }],
-            [speakerContainer, { opacity: [0, 1], y: [15, 0] }, { duration: 0.5, at: 0.6 }],
-            [generateBtn, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4, at: 0.8 }],
-            [quickTemplates, { opacity: [0, 1], y: [10, 0] }, { duration: 0.4, at: 1.0 }]
+            [speakerContainer, { opacity: [0, 1], y: [15, 0] }, { duration: 0.5, at: 0.3 }],
+            [inputContainer, { opacity: [0, 1], y: [20, 0], scale: [0.95, 1] }, { duration: 0.6, at: 0.5 }],
+            [generateBtn, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4, at: 0.7 }]
         ]);
         
         // Floating animation for generate button
@@ -64,7 +60,7 @@ export class UIManager {
         document.body.appendChild(particleContainer);
         
         // Create floating particles
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 12; i++) {
             const particle = document.createElement('div');
             particle.className = 'particle';
             particle.style.left = Math.random() * 100 + '%';
@@ -72,29 +68,6 @@ export class UIManager {
             particle.style.animationDuration = (Math.random() * 20 + 10) + 's';
             particleContainer.appendChild(particle);
         }
-    }
-    
-    private setupGlassEffects() {
-        // Add glassmorphism hover effects to interactive elements
-        const glassElements = document.querySelectorAll('.input-container, .speaker-container, .generate-btn, .template-pill');
-        
-        glassElements.forEach(element => {
-            element.addEventListener('mouseenter', () => {
-                animate(element, { 
-                    boxShadow: '0 8px 32px rgba(99, 102, 241, 0.15)',
-                    backdropFilter: 'blur(20px)',
-                    scale: 1.02
-                }, { duration: 0.3 });
-            });
-            
-            element.addEventListener('mouseleave', () => {
-                animate(element, { 
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                    backdropFilter: 'blur(16px)',
-                    scale: 1
-                }, { duration: 0.3 });
-            });
-        });
     }
     
     async transitionToWorkspace(): Promise<void> {
@@ -108,6 +81,7 @@ export class UIManager {
         // Show audio section first (hidden)
         this.audioSection.classList.remove('hidden');
         this.audioSection.style.opacity = '0';
+        this.audioSection.style.transform = 'translateX(100px)';
         
         // Create the transition timeline
         await timeline([
@@ -115,11 +89,11 @@ export class UIManager {
             [
                 this.heroSection,
                 { 
-                    x: [0, -100],
-                    scale: [1, 0.85],
-                    opacity: [1, 0.95]
+                    x: [0, -50],
+                    scale: [1, 0.95],
+                    opacity: [1, 0.9]
                 },
-                { duration: 0.8, easing: 'ease-in-out' }
+                { duration: 0.6, easing: 'ease-in-out' }
             ],
             
             // Phase 2: Slide in audio section from right
@@ -128,20 +102,20 @@ export class UIManager {
                 {
                     x: [100, 0],
                     opacity: [0, 1],
-                    scale: [0.9, 1]
+                    scale: [0.95, 1]
                 },
-                { duration: 0.8, at: 0.4 }
+                { duration: 0.6, at: 0.3 }
             ],
             
             // Phase 3: Adjust hero section to final position
             [
                 this.heroSection,
                 {
-                    x: [-100, 0],
-                    scale: [0.85, 1],
-                    opacity: [0.95, 1]
+                    x: [-50, 0],
+                    scale: [0.95, 1],
+                    opacity: [0.9, 1]
                 },
-                { duration: 0.6, at: 1.0 }
+                { duration: 0.5, at: 0.8 }
             ]
         ]).finished;
         
@@ -157,10 +131,10 @@ export class UIManager {
         
         // Staggered animation for audio section elements
         timeline([
-            [audioHeader, { opacity: [0, 1], y: [-10, 0] }, { duration: 0.4 }],
-            [waveformContainer, { opacity: [0, 1], scale: [0.95, 1] }, { duration: 0.5, at: 0.2 }],
-            [audioControls, { opacity: [0, 1], y: [10, 0] }, { duration: 0.4, at: 0.4 }],
-            [analyticsPanel, { opacity: [0, 1], x: [20, 0] }, { duration: 0.4, at: 0.6 }]
+            [audioHeader, { opacity: [0, 1], y: [-10, 0] }, { duration: 0.3 }],
+            [waveformContainer, { opacity: [0, 1], scale: [0.95, 1] }, { duration: 0.4, at: 0.2 }],
+            [audioControls, { opacity: [0, 1], y: [10, 0] }, { duration: 0.3, at: 0.4 }],
+            [analyticsPanel, { opacity: [0, 1], y: [10, 0] }, { duration: 0.3, at: 0.5 }]
         ]);
     }
     
@@ -177,9 +151,9 @@ export class UIManager {
                 {
                     x: [0, 100],
                     opacity: [1, 0],
-                    scale: [1, 0.9]
+                    scale: [1, 0.95]
                 },
-                { duration: 0.6 }
+                { duration: 0.5 }
             ],
             
             // Move hero back to center
@@ -190,7 +164,7 @@ export class UIManager {
                     scale: [1, 1],
                     opacity: [1, 1]
                 },
-                { duration: 0.8, at: 0.2 }
+                { duration: 0.6, at: 0.2 }
             ]
         ]).finished;
         
@@ -285,13 +259,6 @@ export class UIManager {
                 `0 0 0 0 ${color}00`
             ]
         }, { duration: 0.6 });
-    }
-    
-    wiggleElement(element: HTMLElement) {
-        animate(element, {
-            x: [0, -5, 5, -5, 5, 0],
-            rotate: [0, -1, 1, -1, 1, 0]
-        }, { duration: 0.5 });
     }
     
     // Loading states
